@@ -9,18 +9,12 @@ export class ApiError extends Error {
   }
 }
 
-function createHttpClient(getToken: () => string): AxiosInstance {
+function createHttpClient(): AxiosInstance {
   const client = axios.create({
     baseURL: API_URL,
     timeout: 30_000,
+    withCredentials: true,
     headers: { Accept: 'application/json' },
-  })
-
-  client.interceptors.request.use(config => {
-    const token = getToken()
-    if (token) config.headers.set('Authorization', `Bearer ${token}`)
-    else config.headers.delete('Authorization')
-    return config
   })
 
   client.interceptors.response.use(
@@ -34,8 +28,8 @@ function createHttpClient(getToken: () => string): AxiosInstance {
   return client
 }
 
-export function createApiClient(getToken: () => string) {
-  const http = createHttpClient(getToken)
+export function createApiClient() {
+  const http = createHttpClient()
 
   return async function request<T>(path: string, config: AxiosRequestConfig = {}): Promise<T> {
     const response = await http.request<T>({ url: path, ...config })

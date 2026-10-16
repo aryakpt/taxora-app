@@ -1,25 +1,23 @@
-import {useMemo, useRef, useState} from 'react';
+import {useMemo, useState} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useNavigate} from 'react-router-dom';
 import {AppHeader} from './shared/components/AppHeader';
 import {AppSidebar} from './shared/components/AppSidebar';
-import {SettingsModal} from './shared/components/SettingsModal';
 import {AppRouter} from './router/AppRouter';
 import {createApiClient} from './shared/api/client';
 import {useChat} from './features/tax-assistant/hooks/useChat';
 import {useConversations} from './features/tax-assistant/hooks/useConversations';
+import {AuthPage} from './shared/auth/pages/AuthPage';
+import {useAuth} from './shared/auth/AuthProvider';
 
 export default function App() {
-  const {t, i18n} = useTranslation();
-  const [token, setToken] = useState(() => localStorage.getItem('taxora-token') || '');
-  const tokenRef = useRef(token);
-  tokenRef.current = token;
-  const request = useMemo(() => createApiClient(() => tokenRef.current), []);
+  const {i18n, t} = useTranslation();
+  const auth = useAuth();
+  const request = useMemo(() => createApiClient(), []);
   const navigate = useNavigate();
-  const history = useConversations(request, token);
+  const history = useConversations(request, auth.user?.id || '');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState('');
 
   const chat = useChat({
@@ -51,30 +49,18 @@ export default function App() {
   }
 
   async function sendQuestion(question: string, period: string, taxpayer: string) {
-    if (!token) {
-      setSettingsOpen(true);
-      setError(t('errors.missingToken'));
-      return;
-    }
     setError('');
     await chat.sendQuestion(question, period, taxpayer, i18n.resolvedLanguage === 'id' ? 'id' : 'en');
   }
 
-  function saveToken(value: string) {
-    localStorage.setItem('taxora-token', value);
-    tokenRef.current = value;
-    setToken(value);
-    setSettingsOpen(false);
-    setError('');
+  async function signOut() {
+    try { await auth.signOut(); }
+    catch { /* Clear local account state even if the server is temporarily unavailable. */ }
+    finally { history.startNew(); }
   }
 
-  function disconnect() {
-    localStorage.removeItem('taxora-token');
-    tokenRef.current = '';
-    setToken('');
-    setSettingsOpen(false);
-    history.startNew();
-  }
+  if (auth.loading) return <main className="auth-screen"><p className="auth-loading">{t('auth.checkingSession')}</p></main>;
+  if (!auth.user) return <AuthPage />;
 
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
@@ -84,11 +70,11 @@ export default function App() {
       <AppSidebar
         activeConversation={history.activeId}
         conversations={history.conversations}
-        token={token}
+        user={auth.user}
         mobileOpen={mobileNavOpen}
         onNewChat={newConversation}
         onOpenConversation={selectConversation}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onSignOut={() => void signOut()}
         onCloseMobile={() => setMobileNavOpen(false)}
       />
       <main id="main-content" className="main-area">
@@ -107,13 +93,6 @@ export default function App() {
           onFeedback={chat.submitFeedback}
         />
       </main>
-      <SettingsModal
-        open={settingsOpen}
-        token={token}
-        onClose={() => setSettingsOpen(false)}
-        onSave={saveToken}
-        onDisconnect={disconnect}
-      />
     </div>
   );
 }

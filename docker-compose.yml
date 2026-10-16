@@ -11,7 +11,9 @@ services:
       - taxora_pg:/var/lib/postgresql/data
   api:
     build: .
-    env_file: .env
+    env_file: backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://taxora:taxora@db:5432/taxora
     ports:
       - "8000:8000"
     depends_on:

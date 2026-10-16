@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.ai import AIProvider
 from backend.auth import admin_user, current_user
+from backend.auth_routes import router as auth_router
 from backend.config import settings
 from backend.db import get_session
 from backend.ingestion import fetch_source, process_document
@@ -18,7 +19,8 @@ from backend.retrieval import hybrid_search
 from backend.schemas import AnswerStatus, ChatRequest, ChatResponse, Claim, IngestionRequest, Source
 
 app = FastAPI(title="Taxora API", version="0.1.0")
-app.add_middleware(CORSMiddleware, allow_origins=[settings.frontend_origin], allow_methods=["*"], allow_headers=["Authorization", "Content-Type"])
+app.add_middleware(CORSMiddleware, allow_origins=[settings.frontend_origin], allow_credentials=True, allow_methods=["*"], allow_headers=["Authorization", "Content-Type"])
+app.include_router(auth_router)
 
 CHAT_COPY = {
     "en": {
