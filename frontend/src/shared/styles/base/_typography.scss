@@ -1,0 +1,99 @@
+// Comfortable reading scale for the consultation UI. Loaded after legacy rules to
+// override the original compact dashboard sizing without changing its layout.
+body,
+button,
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+.nav-item { font-size: 14px; }
+.nav-label,
+.history-heading { font-size: 11px; }
+.history-item { font-size: 13px; }
+.history-empty { font-size: 12px; }
+.privacy-note strong { font-size: 12px; }
+.privacy-note span { font-size: 11px; }
+.profile-copy strong { font-size: 12px; }
+.profile-copy small { font-size: 11px; }
+
+.breadcrumb,
+.crumb-sep,
+.breadcrumb-current { font-size: 12px; }
+.secure-label { font-size: 11px; }
+
+.welcome-eyebrow,
+.prompt-heading,
+.prompt-hint { font-size: 11px; }
+.welcome-subtitle { font-size: 15px; }
+.trust-chips span { font-size: 11px; }
+.suggestion-label { font-size: 13px; }
+.suggestion-text { font-size: 12px; }
+.welcome-disclaimer { font-size: 11px; }
+
+.context-field { font-size: 11px; }
+.context-field input,
+.context-field select { font-size: 12px; }
+.context-caption { font-size: 11px; }
+.composer-box textarea { font-size: 15px; }
+.composer-hint,
+.send-button { font-size: 12px; }
+.composer-disclaimer { font-size: 11px; }
+
+.message-meta strong { font-size: 13px; }
+.ai-badge { font-size: 10px; }
+.message-content { font-size: 15px; }
+.answer-status,
+.answer-note,
+.answer-note strong { font-size: 12px; }
+.source-count { font-size: 11px; }
+.source-type,
+.verification { font-size: 10px; }
+.source-name { font-size: 13px; }
+.source-article { font-size: 11px; }
+.source-card blockquote { font-size: 14px; }
+.source-bottom { font-size: 10px; }
+
+.page-kicker { font-size: 11px; }
+.page-intro { font-size: 14px; }
+.regulation-meta,
+.published-tag,
+.outline-link { font-size: 11px; }
+.regulation-copy h2 { font-size: 19px; }
+.empty-panel p { font-size: 12px; }
+.ingest-form label,
+.settings-modal label { font-size: 12px; }
+.ingest-form > p,
+.job-row strong,
+.text-button { font-size: 12px; }
+.job-row span { font-size: 11px; }
+.jobs-heading h2 { font-size: 15px; }
+.job-status { font-size: 11px !important; }
+.settings-modal > p { font-size: 13px; }
+.token-note { font-size: 11px; }
+
+.language-switcher select { font-size: 12px; }
+
+@media (max-width: 540px) {
+  .breadcrumb,
+  .crumb-sep,
+  .breadcrumb-current { font-size: 11px; }
+  .welcome-subtitle { font-size: 14px; }
+  .trust-chips span { font-size: 10px; }
+  .suggestion-label { font-size: 12px; }
+  .suggestion-text { font-size: 11px; }
+  .welcome-disclaimer { font-size: 10px; }
+  .context-field { font-size: 10px; }
+  .context-field input,
+  .context-field select { font-size: 11px; }
+  .composer-box textarea { font-size: 14px; }
+  .composer-hint,
+  .send-button { font-size: 11px; }
+  .message-content { font-size: 14px; }
+  .source-name { font-size: 12px; }
+  .source-bottom { font-size: 9px; }
+  .outline-link { font-size: 0; }
+  .page-intro { font-size: 13px; }
+  .regulation-copy h2 { font-size: 16px; }
+}

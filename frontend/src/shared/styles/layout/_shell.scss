@@ -1,0 +1,10 @@
+@use '../abstracts/tokens' as tokens;
+
+.app-shell {
+  min-height: 100vh;
+  background: tokens.$color-canvas;
+}
+
+.main-area {
+  min-width: 0;
+}

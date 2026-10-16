@@ -1,0 +1,8 @@
+// Shared global style entrypoint. Legacy rules load first; tokens and modular system rules follow.
+@use './legacy/application';
+@use './abstracts/tokens';
+@use './base/reset';
+@use './base/typography';
+@use './layout/shell';
+@use './components/navigation';
+@use './utilities/motion';

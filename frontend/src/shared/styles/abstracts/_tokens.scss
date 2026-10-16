@@ -1,0 +1,55 @@
+// Shared Taxora design system: change semantic tokens here instead of scattering colors and values.
+$color-ink: #222c39;
+$color-muted: #76808c;
+$color-border: #e5e8ec;
+$color-brand-navy: #203b57;
+$color-brand-green: #317b65;
+$color-brand-green-soft: #e7f2ed;
+$color-gold: #d6a84c;
+$color-canvas: #f7f8fa;
+$color-surface: #ffffff;
+$color-focus: #5c9b84;
+
+$font-body: 'DM Sans', sans-serif;
+$font-display: 'Newsreader', serif;
+
+$radius-control: 6px;
+$radius-card: 9px;
+$radius-dialog: 11px;
+
+$space-1: 4px;
+$space-2: 8px;
+$space-3: 12px;
+$space-4: 16px;
+$space-6: 24px;
+$space-8: 32px;
+
+$motion-fast: 150ms;
+$motion-standard: 220ms;
+
+:root {
+  --color-ink: #{$color-ink};
+  --color-muted: #{$color-muted};
+  --color-border: #{$color-border};
+  --color-brand-navy: #{$color-brand-navy};
+  --color-brand-green: #{$color-brand-green};
+  --color-brand-green-soft: #{$color-brand-green-soft};
+  --color-gold: #{$color-gold};
+  --color-canvas: #{$color-canvas};
+  --color-surface: #{$color-surface};
+  --color-focus: #{$color-focus};
+  // Compatibility aliases used by the legacy UI rules during migration.
+  --ink: #{$color-ink};
+  --muted: #{$color-muted};
+  --line: #{$color-border};
+  --navy: #{$color-brand-navy};
+  --green: #{$color-brand-green};
+  --green-light: #{$color-brand-green-soft};
+  --paper: #{$color-surface};
+  --gold: #{$color-gold};
+  --font-body: #{$font-body};
+  --font-display: #{$font-display};
+  --radius-control: #{$radius-control};
+  --radius-card: #{$radius-card};
+  --radius-dialog: #{$radius-dialog};
+}
