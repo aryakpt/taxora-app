@@ -6,37 +6,60 @@ Taxora is an evidence-first assistant for questions about Indonesian PPh and PPN
 
 - `backend/` — FastAPI application, its `.env.example`, Python requirements, `.venv`, Alembic configuration/migrations, and backend tests.
 - `frontend/` — React/TypeScript client with its own `.env.example`, organized around three page features and routed with React Router (`/`, `/regulations`, `/admin`). `src/router/AppRouter.tsx` owns the route table and `src/App.tsx` composes the application; `src/features/` contains only `tax-assistant/`, `regulation-library/`, and `knowledge-admin/`, each organized into `pages/` and only the supporting `api/`, `hooks/`, or `components/` layers it needs; `src/shared/` contains account authentication, cross-feature API infrastructure, application-shell components, domain types, and global Sass design tokens/styles.
-- `docker-compose.yml`, `Dockerfile` — root deployment configuration; Alembic configuration lives in `backend/alembic.ini` with its migrations.
+- `frontend/package.json` — frontend dependencies and commands.
 - `prd.md` — complete product requirements document.
 
 ## Requirements
 
 - Node.js 20+ and npm
 - Python 3.11+
-- PostgreSQL with pgvector (use the provided Docker Compose configuration)
+- PostgreSQL 16 with the pgvector extension
 - An OpenAI API key for model-backed answers; credentials are not required to build the frontend
 
 ## Configure and run
 
-1. Copy `backend/.env.example` to `backend/.env`. Generate both `AUTH_SECRET_KEY` and `ADMIN_TOKEN` with `openssl rand -hex 32`, and set `OPENAI_API_KEY` to enable answer generation. The OpenAI key stays on the backend and is never entered by end users or exposed to Vite.
-2. Start PostgreSQL with `docker compose up -d db`.
-3. Install backend dependencies into its own environment: `python3 -m venv backend/.venv && backend/.venv/bin/pip install -r backend/requirements.txt`.
-4. Apply migrations from the repository root: `backend/.venv/bin/alembic -c backend/alembic.ini upgrade head`.
-5. Start the API from the repository root: `backend/.venv/bin/uvicorn backend.main:app --reload --port 8000`.
-6. Install frontend dependencies with `cd frontend && npm install`. Optionally copy `frontend/.env.example` to `frontend/.env.local` to set `VITE_API_URL`; then run `npm run dev` from the repository root.
+1. Install PostgreSQL 16 locally and install the pgvector extension compatible with that PostgreSQL installation. Create a database and enable the extension in it with `CREATE EXTENSION vector;`. The migration also enables the extension, but the pgvector files must already be installed on the PostgreSQL server.
+2. Copy `backend/.env.example` to `backend/.env`. Set `DATABASE_URL` to your local PostgreSQL credentials, and replace `AUTH_SECRET_KEY` and `ADMIN_TOKEN` with long random values. Set `OPENAI_API_KEY` to enable answer generation. The OpenAI key stays on the backend and is never entered by end users or exposed to Vite.
+3. From the repository root, create a Python environment and install backend dependencies:
+
+   ```powershell
+   py -m venv backend\.venv
+   backend\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+   ```
+
+4. Apply database migrations from the repository root:
+
+   ```powershell
+   backend\.venv\Scripts\python.exe -m alembic -c backend\alembic.ini upgrade head
+   ```
+
+5. Start the API from the repository root:
+
+   ```powershell
+   backend\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --port 8000
+   ```
+
+6. In another terminal, install and start the frontend from `frontend/`:
+
+   ```powershell
+   cd frontend
+   npm ci
+   npm run dev
+   ```
+
 7. Open the Vite URL (normally `http://localhost:5173`) and create a user account or sign in with email and password. User sessions use an HTTP-only cookie. Set `AUTH_COOKIE_SECURE=true` in HTTPS deployments.
 
 Set `VITE_API_URL` in `frontend/.env.local` to override the API origin (default `http://localhost:8000`), for example `VITE_API_URL=http://localhost:8000`. The backend's `FRONTEND_ORIGIN` must match the browser origin; set it to `http://localhost:5173` for the default Vite server, then restart the API. For production, use frontend/API hosts under the same site (for example `app.example.com` and `api.example.com`) with HTTPS and `AUTH_COOKIE_SECURE=true` so the `SameSite=Lax` session cookie is sent correctly.
 
 ## Frontend commands
 
-From the repository root (after installing frontend dependencies):
+From `frontend/` (after installing frontend dependencies):
 
 - `npm run dev` — start Vite's local development server
 - `npm run build` — run TypeScript validation and create the production build
 - `npm run preview` — serve the production build locally
 
-The same scripts are available directly inside `frontend/`.
+Deployment and CI/CD are not configured yet. When a hosting platform is chosen, configure `VITE_API_URL` for the frontend and `FRONTEND_ORIGIN` for the API to match the deployed origins.
 
 ## Current frontend scope and limitations
 
