@@ -1,12 +1,19 @@
 # PRODUCT REQUIREMENTS DOCUMENT (PRD)
 ## AI Tax Assistant Indonesia — MVP
 
-**Versi:** 1.0  
+**Versi:** 1.1  
 **Status:** Draft untuk implementasi  
 **Produk:** AI Tax Assistant Indonesia  
 **Jenis aplikasi:** Web application berbasis AI  
 **Bahasa utama:** Bahasa Indonesia  
 **Domain awal:** Pajak Penghasilan (PPh) dan Pajak Pertambahan Nilai (PPN)
+
+### Changelog
+
+| Versi | Perubahan |
+|---|---|
+| 1.1 | Menambahkan problem statement dan diferensiasi terhadap LLM umum (§1.5), konsep Modul Pajak/objek pajak sebagai "aturan main" terstruktur (§3.2, FR-15), hierarki sumber hukum (FR-03), tabel `tax_modules` dan `tax_rules` (§6.6–6.7), API modul (§7.6), dan halaman modul pada UI (§12.4). Fokus MVP dipertegas: chatbot LLM-RAG khusus PPh dan PPN. |
+| 1.0 | Draft awal. |
 
 ---
 
@@ -26,6 +33,10 @@ Aplikasi tidak hanya berfungsi sebagai chatbot generik. Nilai utamanya adalah ke
 4. Meminta klarifikasi jika informasi kasus pengguna belum mencukupi.
 5. Membedakan sumber peraturan resmi dengan dokumen penjelas internal.
 6. Menyatakan ketidakpastian ketika bukti yang tersedia tidak memadai.
+
+## 1.1.1 Fokus MVP
+
+Fokus utama MVP adalah **satu fitur inti: AI-Assisted Chatbot perpajakan dengan sumber peraturan**, menggunakan pendekatan LLM-RAG yang mengenkapsulasi pengetahuan pajak ke dalam kategori/modul pajak (PPh dan PPN). Fitur lain dalam dokumen ini ada untuk mendukung kualitas, keterlacakan, dan keamanan chatbot tersebut, bukan sebagai produk terpisah.
 
 ## 1.2 Product Vision
 
@@ -54,6 +65,31 @@ Fitur berikut tidak termasuk MVP:
 - Pengambilan data wajib pajak dari sistem pemerintah yang membutuhkan otorisasi khusus.
 - Fine-tuning model bahasa sebagai kebutuhan awal.
 - Penggantian konsultasi profesional untuk kasus kompleks.
+
+## 1.5 Problem Statement dan Diferensiasi
+
+**Masalah:** LLM umum (ChatGPT, Claude, Gemini, dan sejenisnya) sudah dapat menjawab pertanyaan perpajakan dengan bahasa yang meyakinkan. Karena itu, chatbot yang hanya meneruskan pertanyaan ke LLM tidak memiliki nilai tambah.
+
+Kelemahan LLM umum untuk konsultasi pajak Indonesia:
+
+1. Pengetahuan berhenti pada cutoff training, sehingga peraturan terbaru (misalnya PMK tahun berjalan) bisa tidak diketahui.
+2. Dapat mengarang nomor peraturan, pasal, atau tarif (halusinasi) tanpa tanda.
+3. Tidak membedakan aturan yang berlaku pada periode pajak tertentu dengan aturan yang sudah diubah atau dicabut.
+4. Tidak menampilkan kutipan teks hukum yang dapat diverifikasi pengguna.
+5. Jawaban tidak konsisten antar-pertanyaan karena tidak ada struktur pengetahuan yang tetap.
+
+**Diferensiasi Taxora** (setiap poin harus dapat dibuktikan melalui evaluasi §11, bukan sekadar diklaim):
+
+| Aspek | LLM umum | Taxora |
+|---|---|---|
+| Sumber | Data training, tidak terlihat | Peraturan resmi yang diindeks (BPK, JDIH Kemenkeu, DJP) |
+| Sitasi | Sering tidak ada atau dikarang | Wajib, divalidasi terhadap database (FR-05) |
+| Kemutakhiran | Terbatas cutoff | Re-ingestion saat peraturan baru terbit (FR-09) |
+| Periode pajak | Umumnya diabaikan | Retrieval dan aturan difilter berdasarkan tanggal berlaku (FR-06) |
+| Struktur pengetahuan | Bebas | Modul pajak terstruktur: subjek, objek, tarif, karakteristik (FR-15) |
+| Ketidakpastian | Tetap menjawab dengan yakin | Jalur insufficient-evidence dan pertanyaan klarifikasi (FR-08) |
+
+Konsekuensi untuk evaluasi: konfigurasi "LLM tanpa RAG" (§11, konfigurasi A) wajib diukur sebagai baseline. Jika Taxora tidak lebih baik secara terukur pada citation validity, temporal accuracy, dan answer correctness, nilai produk belum terbukti.
 
 ---
 
@@ -102,10 +138,31 @@ Peran administrator dan reviewer dapat digabungkan pada tahap awal, tetapi izin 
 | FR-12 | Evaluation and monitoring | P0 |
 | FR-13 | Regulation change relationships | P1 |
 | FR-14 | Admin knowledge base dashboard | P1 |
+| FR-15 | Tax modules (objek pajak / aturan main) | P0 |
 
 P0 berarti wajib tersedia untuk pilot MVP. P1 berarti dapat dikembangkan setelah alur inti berfungsi, selama dependensi keamanan dan kualitas tetap terpenuhi.
 
 ## 3.2 Tax Domain Scope
+
+Pengetahuan pajak dikelompokkan ke dalam **Modul Pajak** (lihat FR-15). Setiap modul merepresentasikan satu jenis pajak atau objek pajak dan memuat "aturan main" dengan atribut minimum:
+
+| Atribut | Keterangan |
+|---|---|
+| Subjek pajak | Siapa yang dikenai atau wajib memotong/memungut |
+| Objek pajak | Penghasilan, barang, atau jasa yang dikenai pajak |
+| Pengecualian | Yang bukan objek atau dikecualikan |
+| Tarif | Besaran tarif beserta kondisinya |
+| Dasar pengenaan pajak (DPP) | Dasar perhitungan |
+| Karakteristik | Final/tidak final, pemotongan/pemungutan/setor sendiri, kewajiban administrasi |
+| Dasar hukum | Peraturan dan pasal sumber untuk setiap atribut |
+| Periode berlaku | Tanggal mulai dan akhir berlaku setiap aturan |
+
+Setiap nilai atribut wajib berasal dari ketentuan dalam knowledge base dan memiliki sitasi. Atribut yang belum terverifikasi ditampilkan sebagai "belum tersedia", tidak diisi dari pengetahuan umum model.
+
+Kandidat modul awal di bawah ini harus dikonfirmasi melalui inventaris dokumen sebelum dinyatakan didukung:
+
+- **PPh:** ketentuan umum PPh, PPh Pasal 21, PPh Pasal 22, PPh Pasal 23, PPh Pasal 4 ayat (2) / final, PPh Pasal 25/29, PPh Pasal 26, PPh final UMKM.
+- **PPN:** ketentuan umum PPN, PKP dan pengukuhan, tarif dan DPP, PPN dibebaskan/tidak dipungut, faktur pajak, PPnBM (jika masuk cakupan).
 
 Knowledge base awal mencakup:
 
@@ -182,6 +239,18 @@ Acceptance criteria:
 ## FR-03 — Regulatory Knowledge Base
 
 **Description:** Sistem menyimpan dokumen peraturan dan bagian-bagian hukum dalam struktur yang dapat dicari.
+
+Jenis peraturan yang dicakup (berdasarkan hierarki):
+
+| Jenis | Contoh | Sumber utama |
+|---|---|---|
+| Undang-Undang (UU) | UU PPh, UU PPN, UU KUP, UU HPP | Database Peraturan BPK |
+| Peraturan Pemerintah (PP) | PP pelaksanaan PPh/PPN | Database Peraturan BPK |
+| Peraturan Menteri Keuangan (PMK) | PMK No. 28 Tahun 2026 | Database Peraturan BPK, JDIH Kemenkeu |
+| Peraturan Direktur Jenderal Pajak (PER-DJP) | Peraturan teknis pelaksanaan | pajak.go.id |
+| Dokumen internal | Panduan atau penjelasan internal | Unggahan admin, dengan kontrol akses |
+
+Hierarki ini disimpan sebagai `regulation_type` dan dipakai saat menyusun jawaban: ketentuan dari peraturan lebih tinggi dan lebih spesifik diprioritaskan, dan konflik antar-sumber dinyatakan, tidak disembunyikan. Dokumen internal tidak boleh disajikan sebagai sumber hukum resmi.
 
 Sumber awal:
 
@@ -399,6 +468,28 @@ Acceptance criteria:
 - Kegagalan retrieval dan generasi dapat dibedakan.
 - Perubahan yang menurunkan kualitas dapat dideteksi melalui regression test.
 
+## FR-15 — Tax Modules (Objek Pajak / Aturan Main)
+
+**Description:** Sistem mengenkapsulasi pengetahuan pajak ke dalam modul per jenis/objek pajak (lihat §3.2) sehingga chatbot menjawab dalam kerangka aturan main yang konsisten, bukan hanya dari potongan teks hasil pencarian.
+
+Requirements:
+
+- Setiap regulasi dan chunk dapat ditandai dengan satu atau lebih modul pajak.
+- Query understanding mengklasifikasikan pertanyaan ke modul yang relevan (atau "di luar cakupan"/"tidak pasti").
+- Retrieval memprioritaskan evidence dari modul hasil klasifikasi, tanpa membuang evidence lintas modul yang relevan.
+- Atribut modul (subjek, objek, pengecualian, tarif, DPP, karakteristik) disimpan sebagai `tax_rules` terstruktur yang selalu terhubung ke `legal_provisions` sumbernya dan memiliki periode berlaku.
+- `tax_rules` dibuat atau diusulkan dari dokumen sumber (manual atau dibantu LLM), lalu wajib disetujui reviewer sebelum dipakai sebagai fakta terverifikasi.
+- Chatbot menggunakan `tax_rules` terverifikasi sebagai evidence prioritas, misalnya untuk pertanyaan tarif, dan tetap menampilkan pasal sumbernya.
+- Pengguna dapat menelusuri modul (misalnya "PPh Pasal 23") dan melihat ringkasan aturan main beserta sitasinya.
+- Modul atau atribut yang belum memiliki data terverifikasi ditandai belum tersedia.
+
+Acceptance criteria:
+
+- Pertanyaan pada dataset evaluasi terklasifikasi ke modul yang benar sesuai label referensi (target akurasi ditetapkan pada §11.1).
+- Setiap `tax_rule` yang tampil di UI atau dipakai dalam jawaban memiliki provision sumber dan status verifikasi.
+- Tarif yang ditampilkan sesuai periode pajak yang ditanyakan.
+- Tidak ada atribut modul yang diisi tanpa sumber.
+
 ---
 
 # 5. Technical Architecture
@@ -429,7 +520,8 @@ Gunakan modular monolith dengan modul berikut:
 - `auth`: authentication dan authorization.
 - `chat`: pengelolaan request konsultasi.
 - `conversation`: histori dan konteks percakapan.
-- `query_understanding`: klasifikasi topik dan ekstraksi konteks.
+- `query_understanding`: klasifikasi topik dan modul pajak, serta ekstraksi konteks.
+- `tax_modules`: modul pajak dan aturan main terstruktur (`tax_rules`).
 - `retrieval`: keyword search, vector search, dan ranking.
 - `regulations`: metadata dan versi peraturan.
 - `ingestion`: ekstraksi, normalisasi, dan indexing.
@@ -445,9 +537,9 @@ Setiap modul harus memiliki tanggung jawab yang jelas dan tidak mengakses databa
 
 1. Frontend mengirim pertanyaan ke backend.
 2. Backend memverifikasi identitas dan akses pengguna.
-3. Sistem mengidentifikasi topik dan konteks pertanyaan.
+3. Sistem mengidentifikasi topik, modul pajak, dan konteks pertanyaan.
 4. Sistem memeriksa apakah klarifikasi diperlukan.
-5. Retrieval mencari evidence yang relevan.
+5. Retrieval mencari evidence yang relevan, termasuk `tax_rules` terverifikasi dari modul terkait.
 6. Legal validation memeriksa metadata dan periode hukum.
 7. Evidence assembly membentuk konteks untuk LLM.
 8. LLM menghasilkan jawaban terstruktur.
@@ -526,7 +618,37 @@ Menyimpan hubungan antarperaturan.
 - `effective_from`: waktu berlaku relasi jika diketahui.
 - `verified_at`: waktu verifikasi relasi.
 
-## 6.6 Application Tables
+## 6.6 `tax_modules`
+
+Menyimpan modul pajak (lihat FR-15).
+
+- `id`: UUID primary key.
+- `code`: kode unik, misalnya `pph-23`, `ppn-umum`.
+- `tax_type`: `PPh` atau `PPN`.
+- `name`: nama modul.
+- `parent_id`: relasi hierarki modul (opsional).
+- `description`: deskripsi singkat.
+- `status`: draft, published.
+
+Relasi many-to-many `regulation_modules` (`regulation_id`, `module_id`) menandai regulasi yang relevan untuk modul.
+
+## 6.7 `tax_rules`
+
+Menyimpan aturan main terstruktur per modul.
+
+- `id`: UUID primary key.
+- `module_id`: foreign key ke `tax_modules`.
+- `rule_type`: subject, object, exclusion, rate, tax_base, characteristic, obligation.
+- `summary`: ringkasan aturan dalam bahasa Indonesia.
+- `structured_value`: JSON opsional, misalnya `{ "rate_percent": ..., "condition": ... }`.
+- `source_provision_id`: foreign key ke `legal_provisions` (wajib).
+- `effective_from` / `effective_until`: periode berlaku.
+- `status`: draft, review_required, verified, superseded.
+- `verified_by` / `verified_at`: reviewer dan waktu verifikasi.
+
+Nilai dalam contoh dokumentasi atau fixture tidak boleh dimasukkan sebagai `verified` tanpa review terhadap teks sumber.
+
+## 6.8 Application Tables
 
 Buat tabel berikut:
 
@@ -565,7 +687,8 @@ Request:
   "context": {
     "tax_period": "2026",
     "taxpayer_type": "business",
-    "transaction_type": null
+    "transaction_type": null,
+    "tax_module": null
   }
 }
 ```
@@ -577,6 +700,7 @@ Response minimum:
   "request_id": "uuid",
   "conversation_id": "uuid",
   "answer_status": "answered",
+  "detected_modules": ["pph-23"],
   "answer": "Jawaban berbasis evidence.",
   "claims": [],
   "sources": [],
@@ -616,6 +740,13 @@ Endpoint hanya menampilkan dokumen dan metadata yang boleh dilihat oleh pengguna
 - `POST /api/v1/admin/ingestion/{id}/publish`
 
 Endpoint administratif harus membutuhkan role yang sesuai.
+
+## 7.6 Tax Modules
+
+- `GET /api/v1/tax-modules`: daftar modul yang dipublikasikan.
+- `GET /api/v1/tax-modules/{code}`: detail modul beserta `tax_rules` terverifikasi dan sitasinya. Parameter opsional `?date=YYYY-MM-DD` untuk aturan yang berlaku pada tanggal tersebut.
+- `POST /api/v1/admin/tax-rules`: membuat atau mengusulkan aturan (admin/reviewer).
+- `POST /api/v1/admin/tax-rules/{id}/verify`: verifikasi aturan oleh reviewer.
 
 ---
 
@@ -659,8 +790,9 @@ Requirements:
 
 Urutan retrieval:
 
-1. Extract query terms dan metadata yang diketahui.
-2. Jalankan keyword search.
+1. Extract query terms, metadata yang diketahui, dan modul pajak terkait.
+2. Ambil `tax_rules` terverifikasi dari modul terkait yang berlaku pada periode pajak.
+3. Jalankan keyword search.
 3. Jalankan vector search.
 4. Terapkan authorization filters.
 5. Gabungkan ranking.
@@ -816,6 +948,8 @@ Target berikut adalah ambang awal untuk dievaluasi dan disetujui tim, bukan hasi
 | Answer correctness | ≥ 90% |
 | Temporal accuracy | ≥ 95% |
 | Access-control tests | 100% pass |
+| Tax module classification accuracy | ≥ 90% |
+| Improvement vs. baseline A (LLM tanpa RAG) | Lebih baik secara terukur pada citation validity, temporal accuracy, dan answer correctness |
 | Critical legal error | 0 known unresolved critical errors |
 
 Definisikan denominator, metode sampling, dan kriteria penilaian setiap metrik. Evaluasi harus dilakukan pada dataset yang tidak digunakan untuk menyetel sistem.
@@ -865,7 +999,15 @@ Setiap item sumber menampilkan:
 - Tanggal berlaku jika diketahui.
 - Link ke sumber asli.
 
-## 12.4 Admin Dashboard
+## 12.4 Tax Module Page
+
+- Daftar modul PPh dan PPN.
+- Halaman detail modul berisi subjek, objek, pengecualian, tarif, DPP, dan karakteristik, masing-masing dengan sitasi dan status verifikasi.
+- Pemilih tanggal/periode pajak untuk melihat aturan yang berlaku.
+- Tombol "Tanya tentang modul ini" yang membuka chat dengan `tax_module` terisi.
+- Atribut tanpa data terverifikasi ditampilkan sebagai belum tersedia.
+
+## 12.5 Admin Dashboard
 
 Fitur minimum:
 
@@ -926,14 +1068,16 @@ Implementasikan:
 - Vector indexing.
 - Document approval workflow.
 - Source metadata.
+- Tabel `tax_modules`, `regulation_modules`, dan `tax_rules`, beserta workflow verifikasi aturan.
 
-Deliverable: dokumen dapat dimasukkan, diproses, dan dicari.
+Deliverable: dokumen dapat dimasukkan, diproses, dicari, dan dipetakan ke modul pajak.
 
 ## Phase 3 — RAG Pipeline
 
 Implementasikan:
 
-- Query understanding.
+- Query understanding, termasuk klasifikasi modul pajak.
+- Penggunaan `tax_rules` terverifikasi sebagai evidence prioritas.
 - Hybrid retrieval.
 - Metadata filtering.
 - Evidence assembly.
@@ -953,7 +1097,8 @@ Implementasikan:
 - Source panel.
 - Loading dan error states.
 - Feedback.
-- Admin dashboard dasar.
+- Halaman modul pajak.
+- Admin dashboard dasar, termasuk verifikasi `tax_rules`.
 
 Deliverable: pengguna dapat menjalankan alur konsultasi dari UI.
 
@@ -1000,6 +1145,8 @@ MVP dianggap selesai untuk pilot ketika:
 - [ ] Citation validation diterapkan.
 - [ ] Sistem dapat menangani insufficient evidence.
 - [ ] Sistem mendukung konteks periode pajak.
+- [ ] Modul pajak PPh dan PPN tersedia dengan aturan main terverifikasi dan bersitasi untuk cakupan yang telah diinventaris.
+- [ ] Evaluasi menunjukkan perbandingan terhadap baseline LLM tanpa RAG.
 - [ ] Akses dokumen internal telah diuji.
 - [ ] Conversation history menerapkan ownership checks.
 - [ ] Unit dan integration tests lulus.
