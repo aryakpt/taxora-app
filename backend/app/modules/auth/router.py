@@ -1,34 +1,14 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, EmailStr, Field, StringConstraints
+from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.auth import create_access_token, hash_password, verify_password, current_user
-from backend.config import settings
-from backend.db import get_session
-from backend.models import User
+from app.core.config import settings
+from app.core.database import SessionDep
+from app.core.security import create_access_token, hash_password, verify_password
+from app.modules.auth.dependencies import CurrentUser
+from app.modules.auth.models import User
+from app.modules.auth.schemas import LoginRequest, RegisterRequest, UserResponse
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
-
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    full_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=150)]
-    password: str = Field(min_length=12, max_length=128)
-
-
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=1, max_length=128)
-
-
-class UserResponse(BaseModel):
-    id: str
-    email: str | None
-    full_name: str | None
-    role: str
 
 
 def serialize_user(user: User) -> UserResponse:
@@ -48,11 +28,7 @@ def set_session_cookie(response: Response, user: User) -> None:
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(
-    body: RegisterRequest,
-    response: Response,
-    session: AsyncSession = Depends(get_session),
-):
+async def register(body: RegisterRequest, response: Response, session: SessionDep):
     email = str(body.email).strip().lower()
     existing = await session.scalar(select(User).where(func.lower(User.email) == email))
     if existing is not None:
@@ -66,11 +42,7 @@ async def register(
 
 
 @router.post("/login", response_model=UserResponse)
-async def login(
-    body: LoginRequest,
-    response: Response,
-    session: AsyncSession = Depends(get_session),
-):
+async def login(body: LoginRequest, response: Response, session: SessionDep):
     email = str(body.email).strip().lower()
     user = await session.scalar(select(User).where(func.lower(User.email) == email))
     if user is None or not user.password_hash or not verify_password(body.password, user.password_hash):
@@ -94,5 +66,5 @@ async def logout(response: Response):
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: User = Depends(current_user)):
+async def me(user: CurrentUser):
     return serialize_user(user)

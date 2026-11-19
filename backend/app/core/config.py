@@ -4,9 +4,14 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=Path(__file__).resolve().with_name(".env"), extra="ignore")
+    model_config = SettingsConfigDict(env_file=BACKEND_DIR / ".env", extra="ignore")
+
+    app_env: Literal["development", "test", "production"] = "development"
+    log_level: str = "INFO"
 
     database_url: str = "postgresql+asyncpg://taxora:taxora@localhost:5432/taxora"
     admin_token: str = Field(min_length=32)

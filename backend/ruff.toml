@@ -1,0 +1,9 @@
+line-length = 120
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+  "B008",  # FastAPI File(...) / Depends(...) defaults
+  "E501",  # long strings in moved legacy code; revisit with ruff format
+]
