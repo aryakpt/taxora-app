@@ -1,18 +1,33 @@
 import uuid
 from datetime import datetime
+from enum import Enum
 
-from sqlalchemy import DateTime, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
 
+class UserRole(str, Enum):
+    """PRD §2: reviewers verify documents and legal metadata; admins manage the system."""
+
+    user = "user"
+    reviewer = "reviewer"
+    admin = "admin"
+
+
+ROLE_VALUES = tuple(role.value for role in UserRole)
+
+
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(f"role IN {ROLE_VALUES}", name="ck_users_role"),
+    )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email: Mapped[str | None] = mapped_column(String(320), unique=True, index=True, nullable=True)
     full_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
-    role: Mapped[str] = mapped_column(String(20), default="user")
+    role: Mapped[str] = mapped_column(String(20), default=UserRole.user.value)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

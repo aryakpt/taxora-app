@@ -43,11 +43,12 @@ Each backend module owns its models, schemas, and routes. Request handlers get a
 
 ```bash
 make install                              # backend venv + frontend packages
-cp backend/.env.example backend/.env      # then set AUTH_SECRET_KEY and ADMIN_TOKEN (openssl rand -hex 32)
+cp backend/.env.example backend/.env      # then set AUTH_SECRET_KEY (openssl rand -hex 32)
 make db-up                                # PostgreSQL + pgvector on localhost:5432 (creates taxora and taxora_test)
 make migrate                              # apply Alembic migrations
 make api                                  # http://localhost:8000  (docs at /docs)
 make web                                  # http://localhost:5173  (separate terminal)
+make set-role EMAIL=you@example.com ROLE=admin   # after registering, to open /admin
 ```
 
 Open the Vite URL, then register an account or sign in. Sessions use an HTTP-only cookie; set `AUTH_COOKIE_SECURE=true` behind HTTPS.
@@ -75,8 +76,8 @@ Deployment and CI/CD are not configured yet. When a hosting platform is chosen, 
 
 - The chat sends requests to `POST /api/v1/chat`, shows real loading and API error states, passes optional tax period and taxpayer context, renders evidence citations/official links from the response, and submits feedback to the existing endpoint.
 - The frontend supports English and Indonesian UI copy. The selected language persists in the browser and is sent with chat requests so generated answers and backend insufficient-evidence messages use the chosen language. Legal quotations and regulation titles remain in their source language.
-- Standalone email/password registration and sign-in are implemented. Passwords are hashed with Argon2id; browser sessions use signed, HTTP-only cookies. New accounts receive the `user` role. An administrator can grant an account the `admin` role directly in PostgreSQL; Google OAuth, email verification, password reset, and auth rate limiting are not implemented yet.
-- To grant admin access to an account that has registered, run `UPDATE users SET role = 'admin' WHERE email = 'admin@example.com';` against PostgreSQL, then sign out and sign back in.
+- Email/password registration and sign-in are implemented. Passwords are hashed with Argon2id; browser sessions use signed, HTTP-only cookies (API clients may send the same token as `Authorization: Bearer`). Login is limited to `AUTH_LOGIN_ATTEMPTS_PER_MINUTE` and registration to `AUTH_REGISTRATIONS_PER_HOUR` per client IP; the limiter is in-memory, so counts are per API process. Google OAuth, email verification, password reset, and session revocation are not implemented yet.
+- Roles are `user` (default), `reviewer`, and `admin`. Grant one to a registered account with `make set-role EMAIL=you@example.com ROLE=admin`; the change is written to `audit_logs`, and it applies on the next request (reload the page to update the UI). There is no static admin token.
 - `POST /api/v1/chat` accepts `response_language: "en" | "id"` (defaults to Indonesian for existing clients); the selected value is retained in message metadata.
 - Conversation list/detail, published regulation listing, and administrator ingestion routes are connected to the backend. The UI does not invent regulations, sources, or successful answers.
 - Backend conversation detail currently returns message content and metadata but not source records; therefore reloaded history cannot restore citation cards or per-message feedback state. A successful chat fetches its assistant message ID for feedback because the chat response returns a request ID rather than message ID.

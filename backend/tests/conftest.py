@@ -10,13 +10,13 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://taxora:taxora@localhost:5432/taxora_test"
 )
 os.environ.setdefault("AUTH_SECRET_KEY", "test-only-auth-secret-key-with-more-than-32-bytes")
-os.environ.setdefault("ADMIN_TOKEN", "test-only-admin-service-token-with-more-than-32-bytes")
 os.environ["OPENAI_API_KEY"] = ""  # tests never call a real provider
 
 import httpx  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
 from app.core.database import engine  # noqa: E402
+from app.core.rate_limit import limiter  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
 
@@ -54,6 +54,11 @@ async def clean_database(migrated_database):
     tables = ", ".join(table.name for table in Base.metadata.sorted_tables)
     async with engine.begin() as connection:
         await connection.execute(text(f"TRUNCATE {tables} CASCADE"))
+
+
+@pytest.fixture(autouse=True)
+def reset_rate_limits():
+    limiter.reset()
 
 
 @pytest.fixture

@@ -1,7 +1,7 @@
 BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 
-.PHONY: help db-up db-down db-reset install migrate api web test lint
+.PHONY: help db-up db-down db-reset install migrate api web test lint set-role
 
 help:  ## List available commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
@@ -31,6 +31,10 @@ web:  ## Run the frontend dev server on http://localhost:5173
 
 test:  ## Run backend tests (DB tests are skipped if the database is not running)
 	cd $(BACKEND) && .venv/bin/pytest
+
+set-role:  ## Change a user's role, e.g. make set-role EMAIL=you@example.com ROLE=admin
+	@test -n "$(EMAIL)" -a -n "$(ROLE)" || (echo "usage: make set-role EMAIL=<email> ROLE=<user|reviewer|admin>" && exit 1)
+	cd $(BACKEND) && .venv/bin/python -m app.cli set-role "$(EMAIL)" "$(ROLE)"
 
 lint:  ## Lint backend code
 	cd $(BACKEND) && .venv/bin/ruff check app tests
