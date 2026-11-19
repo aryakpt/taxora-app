@@ -14,12 +14,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     database_url: str = "postgresql+asyncpg://taxora:taxora@localhost:5432/taxora"
-    admin_token: str = Field(min_length=32)
     auth_secret_key: str = Field(min_length=32)
     auth_cookie_secure: bool = False
     auth_cookie_name: str = "taxora_session"
     auth_cookie_samesite: Literal["lax", "strict", "none"] = "lax"
     auth_session_minutes: int = 60
+    # Per client IP; see app/core/rate_limit.py for the single-process limitation.
+    auth_login_attempts_per_minute: int = 10
+    auth_registrations_per_hour: int = 5
     openai_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
     embedding_model: str = "text-embedding-3-small"
