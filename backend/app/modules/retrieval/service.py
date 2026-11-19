@@ -1,11 +1,11 @@
 from datetime import date
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.ai import AIProvider
-from backend.config import settings
-from backend.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
+from app.core.config import settings
+from app.modules.generation.provider import AIProvider
+from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
 
 async def hybrid_search(session: AsyncSession, query: str, user_id, tax_period: str | None) -> list[dict]:

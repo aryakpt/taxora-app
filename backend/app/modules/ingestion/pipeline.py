@@ -1,17 +1,15 @@
 import hashlib
 import re
-from datetime import datetime, timezone
 from pathlib import Path
-from uuid import UUID
 
 import httpx
 from pypdf import PdfReader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.ai import AIProvider
-from backend.config import settings
-from backend.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
+from app.core.config import settings
+from app.modules.generation.provider import AIProvider
+from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
 
 def structural_sections(text: str) -> list[tuple[str | None, str]]:
