@@ -29,8 +29,11 @@ class Settings(BaseSettings):
     llm_model: str = "openrouter/free"
     llm_timeout_seconds: float = 45
     llm_max_output_tokens: int = 1500
-    # OpenRouter only: route to providers that neither retain nor train on prompts.
-    llm_zero_data_retention: bool = True
+    # OpenRouter only: which providers may receive prompts.
+    #   zero_retention: providers must not store prompts at all (no free models qualify today)
+    #   no_training:    providers must not train on or sell prompts, but may retain them for a time
+    #   any:            no restriction (throwaway testing only)
+    llm_data_policy: Literal["zero_retention", "no_training", "any"] = "no_training"
 
     # Embeddings run locally (fastembed); changing the model requires re-indexing all chunks.
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"

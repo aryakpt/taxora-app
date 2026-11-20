@@ -135,3 +135,20 @@ def test_keyword_query_ors_meaningful_terms_and_strips_syntax():
     assert keyword_tsquery("Berapa tarif PPh 23 untuk jasa?") == "tarif | pph | 23 | jasa"
     assert keyword_tsquery("a & b | !c ) (") is None
     assert keyword_tsquery("pajak':* | (rm") == "pajak | rm"
+
+
+# --- LLM data policy ---------------------------------------------------------------------
+
+@pytest.mark.parametrize(("policy", "expected"), [
+    ("zero_retention", {"provider": {"data_collection": "deny", "zdr": True}}),
+    ("no_training", {"provider": {"data_collection": "deny"}}),
+    ("any", None),
+])
+def test_openrouter_data_policy_maps_to_provider_routing(monkeypatch, policy, expected):
+    from app.core.config import settings
+    from app.modules.generation.llm import OpenAICompatibleLLM
+
+    monkeypatch.setattr(settings, "llm_data_policy", policy)
+
+    assert OpenAICompatibleLLM("key", "https://openrouter.ai/api/v1", "m")._extra_body() == expected
+    assert OpenAICompatibleLLM("key", "https://api.openai.com/v1", "m")._extra_body() is None

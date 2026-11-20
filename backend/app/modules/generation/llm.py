@@ -5,6 +5,12 @@ from openai import AsyncOpenAI
 
 from app.core.config import settings
 
+_OPENROUTER_DATA_POLICIES: dict[str, dict | None] = {
+    "zero_retention": {"provider": {"data_collection": "deny", "zdr": True}},
+    "no_training": {"provider": {"data_collection": "deny"}},
+    "any": None,
+}
+
 
 class LLMError(Exception):
     """The provider failed, timed out, or returned no content."""
@@ -27,10 +33,10 @@ class OpenAICompatibleLLM:
         )
 
     def _extra_body(self) -> dict | None:
-        if "openrouter.ai" in self._base_url and settings.llm_zero_data_retention:
-            # Only route to providers that do not store prompts or use them for training.
-            return {"provider": {"data_collection": "deny", "zdr": True}}
-        return None
+        """OpenRouter provider-routing filter for settings.llm_data_policy."""
+        if "openrouter.ai" not in self._base_url:
+            return None
+        return _OPENROUTER_DATA_POLICIES[settings.llm_data_policy]
 
     async def complete_json(self, system: str, user: str) -> str:
         try:
