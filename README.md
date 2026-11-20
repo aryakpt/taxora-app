@@ -48,7 +48,7 @@ make db-up                                # PostgreSQL + pgvector on localhost:5
 make migrate                              # apply Alembic migrations
 make api                                  # http://localhost:8000  (docs at /docs)
 make web                                  # http://localhost:5173  (separate terminal)
-make seed                                 # dev accounts, password taxora-dev-password:
+make seed                                 # dev accounts, password password123:
                                           #   admin@example.com, reviewer@example.com, user@example.com
 ```
 

@@ -16,11 +16,11 @@ from app.core.security import hash_password
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import User, UserRole
 
-DEV_SEED_PASSWORD = "taxora-dev-password"
+DEV_SEED_PASSWORD = "password123"
 DEV_SEED_USERS = (
-    ("admin@example.com", "Dev Admin", UserRole.admin),
-    ("reviewer@example.com", "Dev Reviewer", UserRole.reviewer),
-    ("user@example.com", "Dev User", UserRole.user),
+    ("admin@example.com", "Admin", UserRole.admin),
+    ("reviewer@example.com", "Reviewer", UserRole.reviewer),
+    ("user@example.com", "User", UserRole.user),
 )
 
 
@@ -43,7 +43,7 @@ async def set_role(email: str, role: UserRole) -> str:
 async def seed_dev_users(password: str = DEV_SEED_PASSWORD) -> list[tuple[str, str, str]]:
     """Create one account per role with a known password, for local development only.
 
-    Idempotent: existing seed accounts get their role and password reset.
+    Idempotent: existing seed accounts get their name, role, and password reset.
     Returns (email, role, "created" | "reset") for each account.
     """
     if settings.app_env == "production":
@@ -54,8 +54,9 @@ async def seed_dev_users(password: str = DEV_SEED_PASSWORD) -> list[tuple[str, s
             user = await session.scalar(select(User).where(func.lower(User.email) == email))
             outcome = "reset" if user else "created"
             if user is None:
-                user = User(email=email, full_name=full_name)
+                user = User(email=email)
                 session.add(user)
+            user.full_name = full_name
             user.role = role.value
             user.password_hash = hash_password(password)
             await session.flush()
