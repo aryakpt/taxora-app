@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.modules.generation.provider import AIProvider
+from app.modules.generation import providers
 from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
 
@@ -53,7 +53,7 @@ async def process_document(session: AsyncSession, job, metadata: dict, content: 
     )
     session.add(version)
     await session.flush()
-    ai = AIProvider()
+    embedder = providers.get_embedder()
     for ordinal, (article, section) in enumerate(structural_sections(extracted)):
         provision = LegalProvision(version_id=version.id, provision_type="article", article_number=article,
                                    ordinal=ordinal, text=section)
@@ -63,7 +63,7 @@ async def process_document(session: AsyncSession, job, metadata: dict, content: 
         chunks = [section[i:i + 4500] for i in range(0, len(section), 4200)] or [section]
         for chunk in chunks:
             session.add(DocumentChunk(provision_id=provision.id, chunk_text=chunk,
-                                      token_count=len(chunk.split()), embedding=await ai.embed(chunk)))
+                                      token_count=len(chunk.split()), embedding=await embedder.embed(chunk)))
     return version
 
 

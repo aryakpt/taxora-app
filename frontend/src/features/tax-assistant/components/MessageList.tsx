@@ -10,6 +10,13 @@ interface Props {
   onFeedback: (id: string | undefined, rating: FeedbackRating) => void
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  insufficient_evidence: 'messages.insufficientEvidence',
+  clarification_needed: 'messages.clarificationNeeded',
+  out_of_scope: 'messages.outOfScope',
+  failed: 'messages.failed',
+}
+
 export function MessageList({ messages, busy, feedback, onFeedback }: Props) {
   const { t } = useTranslation()
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -22,7 +29,7 @@ export function MessageList({ messages, busy, feedback, onFeedback }: Props) {
         <div className="message-meta"><strong>{message.role === 'assistant' ? t('messages.assistant') : t('messages.user')}</strong>{message.role === 'assistant' && <span className="ai-badge"><Sparkles size={11} /> {t('messages.aiResponse')}</span>}</div>
         <div className={`message-content ${message.role === 'user' ? 'user-content' : ''}`}>{message.content}</div>
         {message.role === 'assistant' && <>
-          {message.status && message.status !== 'answered' && <div className={`answer-status ${message.status}`}><CircleHelp size={15} /><span>{message.status === 'insufficient_evidence' ? t('messages.insufficientEvidence') : message.status === 'clarification_needed' ? t('messages.clarificationNeeded') : t('messages.failed')}</span></div>}
+          {message.status && message.status !== 'answered' && <div className={`answer-status ${message.status}`}><CircleHelp size={15} /><span>{t(STATUS_LABELS[message.status] ?? 'messages.failed')}</span></div>}
           {!!message.missing?.length && <div className="answer-note"><strong>{t('messages.clarify')}</strong>{message.missing.map(item => <span key={item}>• {item}</span>)}</div>}
           {!!message.limitations?.length && <div className="answer-note limitation"><strong>{t('messages.limitations')}</strong>{message.limitations.map(item => <span key={item}>{item}</span>)}</div>}
           {!!message.sources?.length && <div className="sources-block"><div className="sources-title"><span><BookOpen size={15} /> {t('messages.legalBasis')}</span><span className="source-count">{message.sources.length} {t(message.sources.length === 1 ? 'messages.source' : 'messages.sources')}</span></div>

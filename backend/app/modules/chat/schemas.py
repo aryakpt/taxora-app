@@ -10,18 +10,19 @@ class AnswerStatus(str, Enum):
     answered = "answered"
     clarification_needed = "clarification_needed"
     insufficient_evidence = "insufficient_evidence"
+    out_of_scope = "out_of_scope"
     failed = "failed"
 
 
 class TaxContext(BaseModel):
-    tax_period: str | None = None
-    taxpayer_type: str | None = None
-    transaction_type: str | None = None
+    tax_period: str | None = Field(default=None, max_length=20)
+    taxpayer_type: str | None = Field(default=None, max_length=50)
+    transaction_type: str | None = Field(default=None, max_length=100)
 
 
 class ChatRequest(BaseModel):
     conversation_id: UUID | None = None
-    question: str = Field(min_length=3, max_length=8000)
+    question: str = Field(min_length=3, max_length=4000)
     context: TaxContext = Field(default_factory=TaxContext)
     response_language: Literal["en", "id"] = "id"
 
@@ -29,6 +30,7 @@ class ChatRequest(BaseModel):
 class Claim(BaseModel):
     text: str
     evidence_ids: list[UUID] = []
+    quote: str | None = None
 
 
 class Source(BaseModel):
