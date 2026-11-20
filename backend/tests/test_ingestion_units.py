@@ -1,0 +1,134 @@
+"""Unit tests for source fetching (SSRF guard), storage, and extraction. No database needed."""
+
+import httpx
+import pytest
+
+from app.modules.ingestion import sources, storage
+from app.modules.ingestion.extraction import ExtractionError, chunks, extract_text, structural_sections
+from tests.pdf_fixture import FIXTURE_LINES, make_pdf
+
+PDF = make_pdf(FIXTURE_LINES)
+
+
+# --- URL allowlist -------------------------------------------------------------------------
+
+@pytest.mark.parametrize("url", [
+    "https://peraturan.bpk.go.id/Download/1/fixture.pdf",
+    "https://www.pajak.go.id/sites/default/files/fixture.pdf",
+    "https://PERATURAN.BPK.GO.ID/x.pdf",
+])
+def test_official_https_sources_are_allowed(url):
+    assert sources.check_url(url)
+
+
+@pytest.mark.parametrize("url", [
+    "http://peraturan.bpk.go.id/x.pdf",                 # not https
+    "https://example.com/x.pdf",                        # not allowlisted
+    "https://pajak.go.id.evil.example/x.pdf",           # allowlisted name as a prefix
+    "https://evilpajak.go.id/x.pdf",                    # allowlisted name as a suffix without a dot
+    "https://user:pass@pajak.go.id/x.pdf",              # credentials
+    "https://pajak.go.id:8443/x.pdf",                   # custom port
+    "https://169.254.169.254/latest/meta-data",         # cloud metadata address
+    "file:///etc/passwd",
+    "not a url",
+])
+def test_other_urls_are_rejected(url):
+    with pytest.raises(sources.SourceRejected):
+        sources.check_url(url)
+
+
+def transport(routes: dict[str, httpx.Response]) -> httpx.MockTransport:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return routes.get(str(request.url), httpx.Response(404))
+    return httpx.MockTransport(handler)
+
+
+async def test_fetch_follows_redirects_only_within_allowed_hosts():
+    ok = transport({
+        "https://pajak.go.id/a": httpx.Response(302, headers={"location": "/files/fixture.pdf"}),
+        "https://pajak.go.id/files/fixture.pdf": httpx.Response(200, content=PDF),
+    })
+    content, filename = await sources.fetch_pdf("https://pajak.go.id/a", transport=ok)
+    assert content == PDF and filename == "fixture.pdf"
+
+    escape = transport({"https://pajak.go.id/a": httpx.Response(302, headers={"location": "http://10.0.0.5/admin"})})
+    with pytest.raises(sources.SourceRejected):
+        await sources.fetch_pdf("https://pajak.go.id/a", transport=escape)
+
+
+async def test_fetch_rejects_html_pages_with_a_helpful_message():
+    page = transport({"https://peraturan.bpk.go.id/Details/1": httpx.Response(200, html="<html>detail</html>")})
+
+    with pytest.raises(sources.SourceRejected, match="tautan unduhan PDF langsung"):
+        await sources.fetch_pdf("https://peraturan.bpk.go.id/Details/1", transport=page)
+
+
+async def test_fetch_stops_reading_oversized_documents(monkeypatch):
+    monkeypatch.setattr(sources.settings, "max_upload_bytes", 100)
+    big = transport({"https://pajak.go.id/big.pdf": httpx.Response(200, content=b"%PDF" + b"x" * 500)})
+
+    with pytest.raises(sources.SourceRejected, match="batas ukuran"):
+        await sources.fetch_pdf("https://pajak.go.id/big.pdf", transport=big)
+
+
+async def test_fetch_gives_up_on_redirect_loops():
+    loop = transport({"https://pajak.go.id/a": httpx.Response(302, headers={"location": "https://pajak.go.id/a"})})
+
+    with pytest.raises(sources.SourceRejected, match="redirect"):
+        await sources.fetch_pdf("https://pajak.go.id/a", transport=loop)
+
+
+# --- storage -------------------------------------------------------------------------------
+
+def test_storage_round_trip_is_content_addressed(document_storage):
+    key = storage.save(PDF)
+
+    assert storage.save(PDF) == key and len(key) == 64
+    assert storage.load(key) == PDF
+
+
+@pytest.mark.parametrize("key", ["../../etc/passwd", "a" * 63, "Z" * 64])
+def test_storage_rejects_keys_that_are_not_hashes(key):
+    with pytest.raises(ValueError):
+        storage.load(key)
+
+
+# --- extraction ----------------------------------------------------------------------------
+
+def test_pdf_text_is_split_into_preamble_and_articles():
+    sections = structural_sections(extract_text(PDF))
+
+    assert [(s.kind, s.number) for s in sections] == [("preamble", None), ("article", "1"), ("article", "2")]
+    assert sections[1].text.startswith("Atas penghasilan berupa sewa")
+
+
+def test_amending_regulations_with_roman_articles_are_recognised():
+    sections = structural_sections("Judul\nPasal I\nIsi perubahan.\nPasal II\nMulai berlaku.\nPasal 4A\nTambahan.")
+
+    assert [s.number for s in sections] == [None, "I", "II", "4A"]
+
+
+def test_attachments_are_separated_from_the_last_article_and_page_numbers_removed():
+    text = extract_text(make_pdf([
+        "Pasal 1", "Isi pasal satu.", "- 2 -", "Pasal 2", "Mulai berlaku pada tanggal tertentu.",
+        "Ditetapkan di Jakarta", "LAMPIRAN", "FORMAT SURAT PERMOHONAN", "Pasal ini dirujuk di formulir",
+    ]))
+    sections = structural_sections(text)
+
+    assert "- 2 -" not in text
+    assert [(s.kind, s.number) for s in sections] == [("article", "1"), ("article", "2"), ("attachment", None)]
+    assert "LAMPIRAN" not in sections[1].text
+    assert sections[2].text.startswith("LAMPIRAN")
+
+
+@pytest.mark.parametrize("content", [make_pdf([]), b"%PDF-1.4 broken", b"not a pdf"])
+def test_unreadable_or_textless_pdfs_are_reported(content):
+    with pytest.raises(ExtractionError):
+        extract_text(content)
+
+
+def test_long_articles_are_split_with_overlap():
+    parts = chunks("x" * 10_000)
+
+    assert len(parts) == 3 and all(len(part) <= 4500 for part in parts)
+    assert chunks("pendek") == ["pendek"]

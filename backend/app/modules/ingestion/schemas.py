@@ -1,18 +1,53 @@
 from datetime import date
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, HttpUrl
+from fastapi import UploadFile
+from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+
+from app.modules.ingestion.sources import check_url
 
 
-class IngestionRequest(BaseModel):
-    source_url: HttpUrl
-    regulation_number: str = Field(min_length=1, max_length=100)
-    regulation_type: str = Field(min_length=1, max_length=30)
+class RegulationMetadata(BaseModel):
+    """Metadata an admin supplies for a regulation document (PRD §6.1-6.2). Never inferred by AI."""
+
+    source_url: HttpUrl = Field(description="Official source link, cited to users. Must be on the allowlist.")
+    regulation_number: str = Field(min_length=1, max_length=100, examples=["28 TAHUN 2026"])
+    regulation_type: str = Field(min_length=1, max_length=30, examples=["PMK"])
     title: str = Field(min_length=1, max_length=1000)
     issuer: str = Field(min_length=1, max_length=200)
-    topic: str = Field(pattern="^(PPh|PPN|other)$")
+    topic: Literal["PPh", "PPN", "other"]
     issued_at: date | None = None
     effective_from: date | None = None
     effective_until: date | None = None
     is_internal: bool = False
     allowed_user_ids: list[UUID] = []
+
+    @field_validator("source_url")
+    @classmethod
+    def official_source(cls, value: HttpUrl) -> HttpUrl:
+        check_url(str(value))
+        return value
+
+    @model_validator(mode="after")
+    def coherent(self) -> "RegulationMetadata":
+        if self.effective_from and self.effective_until and self.effective_until < self.effective_from:
+            raise ValueError("effective_until tidak boleh sebelum effective_from")
+        if self.allowed_user_ids and not self.is_internal:
+            raise ValueError("allowed_user_ids hanya berlaku untuk dokumen internal")
+        return self
+
+    def version_metadata(self) -> dict:
+        return {
+            "issued_at": self.issued_at.isoformat() if self.issued_at else None,
+            "effective_from": self.effective_from.isoformat() if self.effective_from else None,
+            "effective_until": self.effective_until.isoformat() if self.effective_until else None,
+            "is_internal": self.is_internal,
+            "allowed_user_ids": [str(user_id) for user_id in self.allowed_user_ids],
+        }
+
+
+class UploadForm(RegulationMetadata):
+    """Multipart form for uploads: the metadata fields plus the PDF itself."""
+
+    file: UploadFile

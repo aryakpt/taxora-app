@@ -15,6 +15,9 @@ class FakeEmbedder:
     async def embed(self, text_value: str) -> list[float]:
         return fake_vector(text_value)
 
+    async def embed_many(self, texts: list[str]) -> list[list[float]]:
+        return [fake_vector(text_value) for text_value in texts]
+
 
 class FakeLLM:
     model = "fake-model"

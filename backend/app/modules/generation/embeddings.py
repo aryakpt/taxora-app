@@ -6,6 +6,8 @@ from typing import Protocol
 class Embedder(Protocol):
     async def embed(self, text: str) -> list[float]: ...
 
+    async def embed_many(self, texts: list[str]) -> list[list[float]]: ...
+
 
 class LocalEmbedder:
     """Multilingual sentence embeddings computed on this machine with fastembed (ONNX, CPU).
@@ -27,7 +29,12 @@ class LocalEmbedder:
         return self._model
 
     async def embed(self, text: str) -> list[float]:
-        def encode() -> list[float]:
-            return next(iter(self._load().embed([text]))).tolist()
+        return (await self.embed_many([text]))[0]
 
-        return await asyncio.to_thread(encode)
+    async def embed_many(self, texts: list[str]) -> list[list[float]]:
+        """Batched: much faster than one call per text when indexing a whole document."""
+
+        def encode() -> list[list[float]]:
+            return [vector.tolist() for vector in self._load().embed(texts)]
+
+        return await asyncio.to_thread(encode) if texts else []
