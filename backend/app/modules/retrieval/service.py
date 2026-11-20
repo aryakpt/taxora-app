@@ -2,7 +2,7 @@ import re
 import uuid
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, literal_column, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -10,6 +10,8 @@ from app.modules.generation.embeddings import Embedder
 from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
 RRF_K = 60
+# Must match the expression of the GIN index (migration 0004) exactly, or the index is not used.
+SIMPLE = literal_column("'simple'::regconfig")
 
 # Question words that carry no legal meaning; dropping them keeps keyword matches meaningful.
 STOPWORDS = frozenset(
@@ -19,12 +21,19 @@ STOPWORDS = frozenset(
 )
 
 
+# Regulation numbers such as "39/PMK.03/2018" or "PER-11/PJ/2025". PostgreSQL's parser keeps them as one
+# token, so they must stay whole in the query to match. Only letters, digits, "/", ".", "-" are kept.
+REGULATION_NUMBER = re.compile(r"[^\W_]+(?:[/.-][^\W_]+)*/[^\W_]+(?:[/.-][^\W_]+)*")
+
+
 def keyword_tsquery(question: str) -> str | None:
     """OR-query of meaningful terms. A plain AND query would demand every word of a long natural
-    question, which almost never matches. Terms are reduced to letters and digits, so the result is
-    always valid to_tsquery syntax."""
-    terms = [t for t in re.findall(r"[^\W_]+", question.lower()) if len(t) >= 2 and t not in STOPWORDS]
-    return " | ".join(dict.fromkeys(terms)) or None
+    question, which almost never matches. Terms are reduced to letters and digits (plus whole
+    regulation numbers), so the result is always valid to_tsquery syntax."""
+    lowered = question.lower()
+    numbers = REGULATION_NUMBER.findall(lowered)
+    words = [t for t in re.findall(r"[^\W_]+", lowered) if len(t) >= 2 and t not in STOPWORDS]
+    return " | ".join(dict.fromkeys(numbers + words)) or None
 
 
 def temporal_reference_date(tax_period: str | None) -> date:
@@ -74,11 +83,12 @@ async def hybrid_search(
     keyword_rows = []
     terms = keyword_tsquery(query)
     if terms:
-        document = func.to_tsvector("simple", DocumentChunk.chunk_text)
-        tsquery = func.to_tsquery("simple", terms)
+        document = func.to_tsvector(SIMPLE, DocumentChunk.chunk_text)
+        tsquery = func.to_tsquery(SIMPLE, terms)
         keyword_rows = (await session.execute(
             base.where(document.op("@@")(tsquery))
-            .order_by(func.ts_rank_cd(document, tsquery).desc())
+            # Normalization 2 divides by document length, so long attachments do not win on size alone.
+            .order_by(func.ts_rank_cd(document, tsquery, 2).desc())
             .limit(candidate_limit)
         )).all()
 
@@ -91,10 +101,10 @@ async def hybrid_search(
     )).all()
 
     scores: dict[uuid.UUID, tuple[object, float]] = {}
-    for rows in (keyword_rows, vector_rows):
+    for rows, weight in ((keyword_rows, settings.retrieval_keyword_weight), (vector_rows, 1.0)):
         for rank, row in enumerate(rows, 1):
             _, score = scores.get(row.chunk_id, (row, 0.0))
-            scores[row.chunk_id] = (row, score + 1 / (RRF_K + rank))
+            scores[row.chunk_id] = (row, score + weight / (RRF_K + rank))
     ordered = sorted(scores.values(), key=lambda item: item[1], reverse=True)[: settings.retrieval_top_k]
     return [
         {

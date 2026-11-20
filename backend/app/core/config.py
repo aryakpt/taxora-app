@@ -42,11 +42,20 @@ class Settings(BaseSettings):
     # Retrieval and chat safety. Thresholds are initial values and must be re-tuned on the
     # evaluation dataset (PRD §11) whenever the embedding model or knowledge base changes.
     retrieval_top_k: int = 5
-    retrieval_max_cosine_distance: float = 0.7  # not yet calibrated: no indexed documents
+    # Calibrated on 6 questions against PMK 28/2026 only (relevant 0.18-0.45, off-topic 0.88+).
+    retrieval_max_cosine_distance: float = 0.7
+    # Weight of the keyword channel in rank fusion (vector = 1.0). Higher values let long chunks that
+    # merely share common words ("pajak", "pengembalian") push out the best semantic match.
+    retrieval_keyword_weight: float = 0.1
     scope_min_similarity: float = 0.25  # calibrated on 16 sample questions only
     chat_requests_per_hour: int = 20
 
-    max_upload_bytes: int = 10 * 1024 * 1024
+    # Ingestion. Source URLs must be https on one of these hosts (or their subdomains); redirects are
+    # re-checked at every hop. Set as JSON in .env, e.g. INGESTION_ALLOWED_HOSTS='["peraturan.bpk.go.id"]'.
+    ingestion_allowed_hosts: list[str] = ["peraturan.bpk.go.id", "jdih.kemenkeu.go.id", "pajak.go.id"]
+    ingestion_fetch_timeout_seconds: float = 30
+    document_storage_dir: Path = BACKEND_DIR / "storage" / "documents"
+    max_upload_bytes: int = 30 * 1024 * 1024
     frontend_origin: str = "http://localhost:5173"
 
 
