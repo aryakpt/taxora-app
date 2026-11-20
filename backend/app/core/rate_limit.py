@@ -40,16 +40,21 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def enforce(key: str, limit: int, window_seconds: int) -> None:
+    """Count one request for `key`; raise 429 with Retry-After when the limit is exceeded."""
+    retry_after = limiter.hit(key, limit, window_seconds)
+    if retry_after is not None:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Please try again later.",
+            headers={"Retry-After": str(math.ceil(retry_after))},
+        )
+
+
 def rate_limit(scope: str, limit: Callable[[], int], window_seconds: int):
     """FastAPI dependency limiting requests per client IP for one endpoint scope."""
 
     async def dependency(request: Request) -> None:
-        retry_after = limiter.hit(f"{scope}:{client_ip(request)}", limit(), window_seconds)
-        if retry_after is not None:
-            raise HTTPException(
-                status_code=429,
-                detail="Too many attempts. Please try again later.",
-                headers={"Retry-After": str(math.ceil(retry_after))},
-            )
+        enforce(f"{scope}:{client_ip(request)}", limit(), window_seconds)
 
     return dependency

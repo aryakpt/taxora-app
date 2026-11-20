@@ -37,7 +37,8 @@ Each backend module owns its models, schemas, and routes. Request handlers get a
 
 - Python 3.10+, Node.js 20+ and npm
 - A Docker runtime (Docker Desktop, OrbStack, or Colima) for PostgreSQL + pgvector
-- An OpenAI API key for model-backed answers (optional for development; without it the chat reports that AI is not configured)
+- An [OpenRouter](https://openrouter.ai/keys) API key in `LLM_API_KEY` for generated answers (free tier: 50 requests/day; optional for development, since without it the chat reports that AI is not configured). Any OpenAI-compatible API works via `LLM_BASE_URL` and `LLM_MODEL`.
+- About 250 MB of disk for the local embedding model, downloaded automatically on first use
 
 ## Configure and run
 
@@ -59,6 +60,19 @@ Open the Vite URL, then register an account or sign in. Sessions use an HTTP-onl
 `VITE_API_URL` in `frontend/.env.local` overrides the API origin (default `http://localhost:8000`). The backend's `FRONTEND_ORIGIN` must match the browser origin. In production, serve frontend and API under the same site (for example `app.example.com` and `api.example.com`) over HTTPS so the `SameSite=Lax` cookie is sent.
 
 The API and frontend run natively for fast reloads and debugging; Docker is only used for the database. A production API image is not defined yet.
+
+## AI and chat safety
+
+- **Embeddings** (finding relevant articles) run locally with `fastembed` and the multilingual model `paraphrase-multilingual-MiniLM-L12-v2` (384 dimensions). No text leaves the server for search. Changing the model requires re-indexing every chunk.
+- **LLM** (writing the answer) is called through an OpenAI-compatible API, OpenRouter's free router by default.
+- Each question passes these layers, and each can stop it:
+  1. **Scope guard** (`query_understanding`): a tax-term match, or embedding similarity to tax-topic anchors ≥ `SCOPE_MIN_SIMILARITY`. Off-topic questions get `answer_status: "out_of_scope"` without retrieval or an LLM call.
+  2. **Relevance thresholds** in retrieval: keyword matches must match the query (OR of meaningful terms), vector matches must be within `RETRIEVAL_MAX_COSINE_DISTANCE`. No match means `insufficient_evidence` and no LLM call.
+  3. **Structured prompt**: the question, case context, and evidence are wrapped in tags and treated as untrusted data; text cannot open or close those tags.
+  4. **Citation validation**: a claim is kept only if it cites evidence that was retrieved and quotes it verbatim; sources show the verified passage. If the model declares a question out of scope, its text is discarded.
+  5. **Per-user chat limit** (`CHAT_REQUESTS_PER_HOUR`) to protect the shared LLM quota.
+- Thresholds are initial values (the scope threshold was checked on 16 sample questions; the retrieval threshold has not been calibrated because no documents are indexed yet). Re-tune them on the evaluation dataset. These layers reduce, but cannot eliminate, prompt-injection risk; the answer text itself is not checked claim by claim.
+- Each answer stores its prompt version, model, scope decision, retrieved and cited evidence IDs, and latency in message metadata; prompts are not stored.
 
 ## Tests and checks
 
@@ -84,7 +98,7 @@ Deployment and CI/CD are not configured yet. When a hosting platform is chosen, 
 - `POST /api/v1/chat` accepts `response_language: "en" | "id"` (defaults to Indonesian for existing clients); the selected value is retained in message metadata.
 - Conversation list/detail, published regulation listing, and administrator ingestion routes are connected to the backend. The UI does not invent regulations, sources, or successful answers.
 - Backend conversation detail currently returns message content and metadata but not source records; therefore reloaded history cannot restore citation cards or per-message feedback state. A successful chat fetches its assistant message ID for feedback because the chat response returns a request ID rather than message ID.
-- The `OPENAI_API_KEY` is a server-side provider credential configured by the application operator. Users do not supply provider keys. Authentication currently uses first-party email/password accounts; use HTTPS, secure cookies, rate limiting, and a security review before public launch.
+- `LLM_API_KEY` is a server-side credential configured by the operator; users never supply provider keys. `LLM_DATA_POLICY` controls which OpenRouter providers may receive prompts: `no_training` (default; providers may not train on or sell prompts but may retain them for a time), `zero_retention` (no retention at all; as of November 2026 no free model qualifies, so it needs a paid model), or `any`. Review this before handling real user data. If no provider matches the policy, the chat returns a `failed` status. Authentication currently uses first-party email/password accounts; use HTTPS, secure cookies, rate limiting, and a security review before public launch.
 - Backend upload currently rejects document uploads after validation, and the ingestion endpoint processes synchronously. This frontend exposes URL ingestion only, matching the functional endpoint available now.
 - Ingestion status is visible in the admin screen, but approval/publication actions, audit history, evaluation results, and regulation-version editing are not yet exposed in the frontend.
 - The source library contains only published regulations returned by the backend; it does not seed sample legal data. No evaluation scores or verified legal coverage are claimed.

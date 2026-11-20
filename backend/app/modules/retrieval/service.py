@@ -1,56 +1,114 @@
+import re
+import uuid
 from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.modules.generation.provider import AIProvider
+from app.modules.generation.embeddings import Embedder
 from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
+RRF_K = 60
 
-async def hybrid_search(session: AsyncSession, query: str, user_id, tax_period: str | None) -> list[dict]:
-    ai = AIProvider()
-    vector = await ai.embed(query)
-    today = date.today()
+# Question words that carry no legal meaning; dropping them keeps keyword matches meaningful.
+STOPWORDS = frozenset(
+    "yang dan di ke dari untuk atau pada dengan ini itu apa apakah berapa bagaimana kapan siapa mengapa kenapa "
+    "saya kami kita anda adalah akan bisa dapat jika kalau tidak ada sudah juga atas oleh dalam tentang "
+    "the a an is are of for to in on and or what how when which who does do my".split()
+)
+
+
+def keyword_tsquery(question: str) -> str | None:
+    """OR-query of meaningful terms. A plain AND query would demand every word of a long natural
+    question, which almost never matches. Terms are reduced to letters and digits, so the result is
+    always valid to_tsquery syntax."""
+    terms = [t for t in re.findall(r"[^\W_]+", question.lower()) if len(t) >= 2 and t not in STOPWORDS]
+    return " | ".join(dict.fromkeys(terms)) or None
+
+
+def temporal_reference_date(tax_period: str | None) -> date:
     try:
-        year = int(tax_period[:4]) if tax_period else today.year
-        temporal_date = date(year, 12, 31)
+        year = int(tax_period[:4]) if tax_period else None
+        return date(year, 12, 31) if year else date.today()
     except (ValueError, TypeError):
-        temporal_date = today
-    base = select(
-        DocumentChunk.id.label("chunk_id"), DocumentChunk.chunk_text, LegalProvision.id.label("provision_id"),
-        LegalProvision.article_number, LegalProvision.paragraph_number, RegulationVersion.id.label("version_id"),
-        RegulationVersion.source_url, RegulationVersion.status, RegulationVersion.effective_from,
-        RegulationVersion.effective_until, RegulationVersion.is_internal, RegulationVersion.allowed_user_ids,
-        Regulation.regulation_number, Regulation.title,
-    ).join(LegalProvision, DocumentChunk.provision_id == LegalProvision.id).join(
-        RegulationVersion, LegalProvision.version_id == RegulationVersion.id
-    ).join(Regulation, RegulationVersion.regulation_id == Regulation.id).where(
-        RegulationVersion.status == "published",
-        (RegulationVersion.effective_from.is_(None) | (RegulationVersion.effective_from <= temporal_date)),
-        (RegulationVersion.effective_until.is_(None) | (RegulationVersion.effective_until >= temporal_date)),
-        ((RegulationVersion.is_internal.is_(False)) | RegulationVersion.allowed_user_ids.contains([str(user_id)])),
+        return date.today()
+
+
+async def hybrid_search(
+    session: AsyncSession,
+    query: str,
+    user_id: uuid.UUID,
+    tax_period: str | None,
+    embedder: Embedder,
+) -> list[dict]:
+    """Keyword + vector search over published, effective, permitted chunks, fused with Reciprocal
+    Rank Fusion. Each channel only returns chunks above its relevance threshold, so an unrelated
+    question returns no evidence instead of the "least bad" chunks."""
+    reference_date = temporal_reference_date(tax_period)
+    base = (
+        select(
+            DocumentChunk.id.label("chunk_id"),
+            DocumentChunk.chunk_text,
+            LegalProvision.article_number,
+            LegalProvision.paragraph_number,
+            RegulationVersion.source_url,
+            RegulationVersion.status,
+            RegulationVersion.effective_from,
+            RegulationVersion.effective_until,
+            Regulation.regulation_number,
+            Regulation.title,
+        )
+        .join(LegalProvision, DocumentChunk.provision_id == LegalProvision.id)
+        .join(RegulationVersion, LegalProvision.version_id == RegulationVersion.id)
+        .join(Regulation, RegulationVersion.regulation_id == Regulation.id)
+        .where(
+            RegulationVersion.status == "published",
+            RegulationVersion.effective_from.is_(None) | (RegulationVersion.effective_from <= reference_date),
+            RegulationVersion.effective_until.is_(None) | (RegulationVersion.effective_until >= reference_date),
+            RegulationVersion.is_internal.is_(False) | RegulationVersion.allowed_user_ids.contains([str(user_id)]),
+        )
     )
-    keyword_rows = (await session.execute(base.order_by(func.ts_rank_cd(
-        func.to_tsvector("simple", DocumentChunk.chunk_text), func.plainto_tsquery("simple", query)
-    ).desc()).limit(settings.retrieval_top_k * 3))).all()
-    vector_rows = []
-    if vector:
-        vector_rows = (await session.execute(base.order_by(DocumentChunk.embedding.cosine_distance(vector)).limit(
-            settings.retrieval_top_k * 3
-        ))).all()
-    # Reciprocal Rank Fusion keeps the two independent retrieval channels inspectable.
-    ranks: dict[str, tuple[object, float]] = {}
+    candidate_limit = settings.retrieval_top_k * 3
+
+    keyword_rows = []
+    terms = keyword_tsquery(query)
+    if terms:
+        document = func.to_tsvector("simple", DocumentChunk.chunk_text)
+        tsquery = func.to_tsquery("simple", terms)
+        keyword_rows = (await session.execute(
+            base.where(document.op("@@")(tsquery))
+            .order_by(func.ts_rank_cd(document, tsquery).desc())
+            .limit(candidate_limit)
+        )).all()
+
+    vector = await embedder.embed(query)
+    distance = DocumentChunk.embedding.cosine_distance(vector)
+    vector_rows = (await session.execute(
+        base.where(DocumentChunk.embedding.is_not(None), distance <= settings.retrieval_max_cosine_distance)
+        .order_by(distance)
+        .limit(candidate_limit)
+    )).all()
+
+    scores: dict[uuid.UUID, tuple[object, float]] = {}
     for rows in (keyword_rows, vector_rows):
         for rank, row in enumerate(rows, 1):
-            key = str(row.chunk_id)
-            old = ranks.get(key, (row, 0.0))
-            ranks[key] = (row, old[1] + 1 / (60 + rank))
-    ordered = sorted(ranks.values(), key=lambda item: item[1], reverse=True)[:settings.retrieval_top_k]
-    return [{
-        "id": row.chunk_id, "text": row.chunk_text, "regulation": f"{row.regulation_number} — {row.title}",
-        "article": f"Pasal {row.article_number}" if row.article_number else None,
-        "paragraph": row.paragraph_number, "source_url": row.source_url, "status": row.status,
-        "effective_from": row.effective_from, "effective_until": row.effective_until,
-        "regulation_number": row.regulation_number, "title": row.title,
-    } for row, _ in ordered]
+            _, score = scores.get(row.chunk_id, (row, 0.0))
+            scores[row.chunk_id] = (row, score + 1 / (RRF_K + rank))
+    ordered = sorted(scores.values(), key=lambda item: item[1], reverse=True)[: settings.retrieval_top_k]
+    return [
+        {
+            "id": row.chunk_id,
+            "text": row.chunk_text,
+            "regulation": f"{row.regulation_number} — {row.title}",
+            "article": f"Pasal {row.article_number}" if row.article_number else None,
+            "paragraph": row.paragraph_number,
+            "source_url": row.source_url,
+            "status": row.status,
+            "effective_from": row.effective_from,
+            "effective_until": row.effective_until,
+            "regulation_number": row.regulation_number,
+            "title": row.title,
+        }
+        for row, _ in ordered
+    ]

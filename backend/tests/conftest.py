@@ -10,7 +10,7 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://taxora:taxora@localhost:5432/taxora_test"
 )
 os.environ.setdefault("AUTH_SECRET_KEY", "test-only-auth-secret-key-with-more-than-32-bytes")
-os.environ["OPENAI_API_KEY"] = ""  # tests never call a real provider
+os.environ["LLM_API_KEY"] = ""  # tests never call a real provider; see the fake_ai fixture
 
 import httpx  # noqa: E402
 from sqlalchemy import text  # noqa: E402
@@ -19,6 +19,8 @@ from app.core.database import engine  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
+from app.modules.generation import providers  # noqa: E402
+from tests.fakes import FakeEmbedder, FakeLLM  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -59,6 +61,27 @@ async def clean_database(migrated_database):
 @pytest.fixture(autouse=True)
 def reset_rate_limits():
     limiter.reset()
+
+
+@pytest.fixture(autouse=True)
+def fake_ai(monkeypatch):
+    """Replace AI providers in every test: no model download, no network calls.
+    The LLM is unconfigured by default; tests opt in with `fake_ai.enable_llm()`."""
+
+    class Providers:
+        embedder = FakeEmbedder()
+        llm = FakeLLM()
+        llm_enabled = False
+
+        def enable_llm(self, response: str | Exception = "{}") -> FakeLLM:
+            self.llm_enabled, self.llm.response = True, response
+            return self.llm
+
+    state = Providers()
+    monkeypatch.setattr(providers, "get_embedder", lambda: state.embedder)
+    monkeypatch.setattr(providers, "get_llm", lambda: state.llm if state.llm_enabled else None)
+    return state
+
 
 
 @pytest.fixture
