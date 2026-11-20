@@ -48,8 +48,11 @@ make db-up                                # PostgreSQL + pgvector on localhost:5
 make migrate                              # apply Alembic migrations
 make api                                  # http://localhost:8000  (docs at /docs)
 make web                                  # http://localhost:5173  (separate terminal)
-make set-role EMAIL=you@example.com ROLE=admin   # after registering, to open /admin
+make seed                                 # dev accounts, password password123:
+                                          #   admin@example.com, reviewer@example.com, user@example.com
 ```
+
+To change the role of any other registered account: `make set-role EMAIL=you@example.com ROLE=admin`.
 
 Open the Vite URL, then register an account or sign in. Sessions use an HTTP-only cookie; set `AUTH_COOKIE_SECURE=true` behind HTTPS.
 
