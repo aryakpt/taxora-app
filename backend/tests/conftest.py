@@ -44,9 +44,13 @@ def _upgrade_to_head() -> None:
 
 @pytest.fixture(scope="session")
 async def migrated_database():
-    """Apply all Alembic migrations once per run; skip DB tests when Postgres is not running."""
+    """Apply all Alembic migrations once per run. Locally, DB tests are skipped when Postgres is not running;
+    with REQUIRE_TEST_DATABASE=1 (CI) they fail instead, so a missing database cannot pass as green."""
     if not await _database_reachable():
-        pytest.skip("Test database unavailable: run `make db-up` (docker compose up -d db)")
+        message = "Test database unavailable: run `make db-up` (docker compose up -d db)"
+        if os.environ.get("REQUIRE_TEST_DATABASE") == "1":
+            pytest.fail(message, pytrace=False)
+        pytest.skip(message)
     # Alembic's env.py calls asyncio.run(), which cannot run inside pytest's active event loop.
     await asyncio.to_thread(_upgrade_to_head)
 

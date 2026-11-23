@@ -1,0 +1,73 @@
+# Runs on every pull request and on pushes to main: backend lint + tests (with PostgreSQL + pgvector),
+# and the frontend type check + production build.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (ruff + pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      db:
+        image: pgvector/pgvector:pg16  # same image as docker-compose.yml
+        env:
+          POSTGRES_USER: taxora
+          POSTGRES_PASSWORD: taxora
+          POSTGRES_DB: taxora
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U taxora" --health-interval 5s --health-timeout 5s --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      PGPASSWORD: taxora
+      REQUIRE_TEST_DATABASE: "1"  # fail, do not skip, if the database is unreachable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Create the test database (same script as the local Docker volume)
+        run: psql -h localhost -U taxora -d taxora -v ON_ERROR_STOP=1 -f ../infra/postgres/init/01-databases.sql
+      - name: Lint
+        run: ruff check .
+      - name: Test
+        run: pytest -q -rs
+
+  frontend:
+    name: Frontend (type check + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check and build
+        run: npm run build
