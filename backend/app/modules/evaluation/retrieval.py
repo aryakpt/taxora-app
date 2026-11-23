@@ -28,12 +28,23 @@ CASES_DIR = Path(__file__).parent / "cases"
 NOBODY = uuid.UUID(int=0)  # no user: only non-internal documents are searched
 
 
+class Expected(BaseModel):
+    regulation: str
+    articles: list[str]
+
+
 class Case(BaseModel):
     id: str
     question: str
     expect: Literal["answer", "out_of_scope", "not_in_kb"]
     regulation: str | None = None
     articles: list[str] = []
+    # Other places that also count as the right answer, e.g. the amending regulation that rewrote the article.
+    alternatives: list[Expected] = []
+
+    def expected(self) -> list[Expected]:
+        primary = [Expected(regulation=self.regulation, articles=self.articles)] if self.regulation else []
+        return primary + self.alternatives
 
 
 class Dataset(BaseModel):
@@ -57,6 +68,10 @@ def load(name: str = "pmk_28_2026") -> Dataset:
     return Dataset.model_validate(json.loads((CASES_DIR / f"{name}.json").read_text()))
 
 
+def load_all() -> list[Dataset]:
+    return [load(path.stem) for path in sorted(CASES_DIR.glob("*.json"))]
+
+
 def _label(item: dict) -> str:
     return f"{item['regulation_number']} {item['article'] or '(pembukaan)'}"
 
@@ -74,9 +89,11 @@ async def evaluate_case(session: AsyncSession, case: Case, embedder: Embedder,
     retrieved = [_label(item) for item in evidence]
     if case.expect == "not_in_kb":
         return CaseResult(case.id, case.expect, passed=None, in_scope=True, retrieved=retrieved)
+    expected = case.expected()
     rank = next((position for position, item in enumerate(evidence, 1)
-                 if item["regulation_number"] == case.regulation and item["provision_type"] == "article"
-                 and item["article_number"] in case.articles), None)
+                 if item["provision_type"] == "article"
+                 and any(item["regulation_number"] == e.regulation and item["article_number"] in e.articles
+                         for e in expected)), None)
     return CaseResult(case.id, case.expect, passed=rank is not None, in_scope=True, rank=rank, retrieved=retrieved)
 
 

@@ -110,8 +110,8 @@ queued ─▶ processing ─▶ review_required ─(reviewer)─▶ approved ─
 
 ## Evaluation and baseline
 
-- `make eval` scores the scope guard and retrieval on `backend/app/modules/evaluation/cases/pmk_28_2026.json` (no LLM call, free and repeatable); `make eval-draft` also searches documents still under review. Results are stored in `evaluation_runs` and listed at `GET /api/v1/admin/evaluations`.
-- The dataset's expected articles were labeled from the extracted text and have **not been confirmed by a tax reviewer** (`reviewed_by: null`); treat scores as indicative. Current result on PMK 28/2026: expected article in the top 5 for 10 of 14 questions, all 6 off-topic questions refused.
+- `make eval` scores the scope guard and retrieval on every dataset in `backend/app/modules/evaluation/cases/` (no LLM call, free and repeatable); `make eval-draft` also searches documents still under review. Results are stored in `evaluation_runs` and listed at `GET /api/v1/admin/evaluations`. A case can list `alternatives`, for example the amending regulation that rewrote the expected article.
+- The datasets' expected articles were located in the extracted text and have **not been confirmed by a tax reviewer** (`reviewed_by: null`); treat scores as indicative. With the eight core PPh/PPN regulations added (Nov 2026, draft search): expected article in the top 5 for 6 of 14 core questions and 8 of 14 PMK 28/2026 questions (10 of 14 when PMK 28/2026 was the only document). Retrieval quality drops as the knowledge base grows; improving it is the next step.
 - `make ask-raw Q="..."` asks the configured LLM directly, without sources, scope guard, or citation checks, to compare a plain LLM answer with Taxora's.
 - `make reprocess JOB=<id>` re-extracts a document that is still under review with the current extractor. Approved and published versions are never changed.
 

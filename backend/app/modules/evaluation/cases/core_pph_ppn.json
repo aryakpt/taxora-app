@@ -1,0 +1,27 @@
+{
+  "name": "core-pph-ppn-retrieval",
+  "description": "Questions on the core PPh and PPN regulations (UU 36/2008, UU 42/2009, UU 7/2021, PP 55/2022, PP 20/2026, PP 58/2023, PMK 168/2023, PMK 131/2024). Expected articles were located by searching the extracted text for the provision (for example 'Tarif Pajak Pertambahan Nilai yaitu: a. sebesar 11%' in UU 7/2021 Pasal 7) and still need confirmation by a tax reviewer.",
+  "reviewed_by": null,
+  "cases": [
+    {"id": "ppn-rate-hpp", "question": "Berapa tarif PPN menurut UU Harmonisasi Peraturan Perpajakan?", "expect": "answer", "regulation": "7 TAHUN 2021", "articles": ["7"]},
+    {"id": "ppn-rate-2009", "question": "Berapa tarif Pajak Pertambahan Nilai dalam UU Nomor 42 Tahun 2009?", "expect": "answer", "regulation": "42 TAHUN 2009", "articles": ["7"]},
+    {"id": "pph-object", "question": "Apa saja yang menjadi objek pajak penghasilan?", "expect": "answer", "regulation": "36 TAHUN 2008", "articles": ["4"]},
+    {"id": "ptkp", "question": "Berapa besar Penghasilan Tidak Kena Pajak per tahun?", "expect": "answer", "regulation": "36 TAHUN 2008", "articles": ["7"]},
+    {"id": "pph-individual-brackets", "question": "Berapa tarif PPh orang pribadi untuk penghasilan kena pajak sampai Rp60 juta?", "expect": "answer", "regulation": "7 TAHUN 2021", "articles": ["17"]},
+    {"id": "umkm-threshold", "question": "Berapa batas peredaran bruto untuk PPh final UMKM?", "expect": "answer", "regulation": "55 TAHUN 2022", "articles": ["57"], "alternatives": [{"regulation": "20 TAHUN 2026", "articles": ["57"]}]},
+    {"id": "umkm-500-million", "question": "Apakah wajib pajak orang pribadi dengan omzet sampai Rp500 juta setahun dikenai PPh?", "expect": "answer", "regulation": "55 TAHUN 2022", "articles": ["60"]},
+    {"id": "ter-categories", "question": "Bagaimana pengelompokan tarif efektif bulanan PPh Pasal 21?", "expect": "answer", "regulation": "58 TAHUN 2023", "articles": ["2"]},
+    {"id": "pph21-withholders", "question": "Siapa saja yang wajib melakukan pemotongan PPh Pasal 21?", "expect": "answer", "regulation": "168 TAHUN 2023", "articles": ["2"]},
+    {"id": "pph21-last-period", "question": "Apa yang dimaksud dengan Masa Pajak Terakhir dalam pemotongan PPh Pasal 21?", "expect": "answer", "regulation": "168 TAHUN 2023", "articles": ["1"]},
+    {"id": "ppn-12-luxury", "question": "Atas barang apa PPN dihitung 12% dikali harga jual?", "expect": "answer", "regulation": "131 TAHUN 2024", "articles": ["2"]},
+    {"id": "ppn-rate-now", "question": "Berapa tarif PPN yang berlaku saat ini?", "expect": "answer", "regulation": "7 TAHUN 2021", "articles": ["7"]},
+    {"id": "pph21-employee", "question": "Berapa tarif PPh Pasal 21 untuk karyawan tetap?", "expect": "answer", "regulation": "58 TAHUN 2023", "articles": ["2"], "alternatives": [{"regulation": "7 TAHUN 2021", "articles": ["17"]}]},
+    {"id": "ppn-other-value", "question": "Berapa dasar pengenaan pajak nilai lain untuk PPN atas barang yang bukan barang mewah?", "expect": "answer", "regulation": "131 TAHUN 2024", "articles": ["3"]},
+
+    {"id": "off-football", "question": "Siapa pemenang piala dunia terakhir?", "expect": "out_of_scope"},
+    {"id": "off-cooking", "question": "Bagaimana cara membuat nasi goreng?", "expect": "out_of_scope"},
+
+    {"id": "gap-stamp-duty", "question": "Berapa tarif bea meterai untuk dokumen perjanjian?", "expect": "not_in_kb"},
+    {"id": "gap-pbb", "question": "Bagaimana cara menghitung PBB rumah?", "expect": "not_in_kb"}
+  ]
+}
