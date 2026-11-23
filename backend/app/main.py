@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,12 +14,24 @@ from app.modules.conversations.router import router as conversations_router
 from app.modules.evaluation.router import router as evaluation_router
 from app.modules.feedback.router import router as feedback_router
 from app.modules.ingestion.router import router as ingestion_router
+from app.modules.ingestion.service import recover_interrupted_jobs
 from app.modules.regulations.router import router as regulations_router
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    try:
+        recovered = await recover_interrupted_jobs()
+        if recovered:
+            observability.logger.warning("marked %s interrupted ingestion job(s) as failed", recovered)
+    except Exception:
+        observability.logger.exception("could not check for interrupted ingestion jobs")
+    yield
 
 
 def create_app() -> FastAPI:
     observability.configure_logging()
-    app = FastAPI(title="Taxora API", version="0.1.0")
+    app = FastAPI(title="Taxora API", version="0.1.0", lifespan=lifespan)
 
     # Registered before CORS so CORS stays outermost and also decorates error responses.
     observability.install(app)

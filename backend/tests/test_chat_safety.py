@@ -137,6 +137,12 @@ def test_keyword_query_ors_meaningful_terms_and_strips_syntax():
     assert keyword_tsquery("pajak':* | (rm") == "pajak | rm"
 
 
+def test_keyword_query_keeps_regulation_numbers_whole():
+    # PostgreSQL indexes "39/PMK.03/2018" as one token, so splitting it would never match.
+    assert keyword_tsquery("Apakah 39/PMK.03/2018 dan PER-11/PJ/2025 berlaku?").split(" | ")[:2] == [
+        "39/pmk.03/2018", "per-11/pj/2025"]
+
+
 # --- LLM data policy ---------------------------------------------------------------------
 
 @pytest.mark.parametrize(("policy", "expected"), [

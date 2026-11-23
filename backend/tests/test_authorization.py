@@ -12,7 +12,7 @@ from app.modules.auth.models import User, UserRole
 
 pytestmark = pytest.mark.db
 
-ADMIN_ONLY = "/api/v1/admin/ingestion"
+ADMIN_ONLY = "/api/v1/admin/evaluations"
 PASSWORD = "a-long-test-password-123"
 
 

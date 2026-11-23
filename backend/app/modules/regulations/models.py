@@ -12,6 +12,8 @@ from app.core.database import Base
 
 class Regulation(Base):
     __tablename__ = "regulations"
+    # One record per regulation; new documents for it become versions (PRD §6.1-6.2).
+    __table_args__ = (UniqueConstraint("regulation_type", "regulation_number", name="uq_regulations_type_number"),)
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     regulation_number: Mapped[str] = mapped_column(String(100))
     regulation_type: Mapped[str] = mapped_column(String(30))
@@ -28,6 +30,7 @@ class RegulationVersion(Base):
     regulation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("regulations.id", ondelete="CASCADE"))
     source_url: Mapped[str] = mapped_column(Text)
     document_hash: Mapped[str] = mapped_column(String(64))
+    storage_key: Mapped[str | None] = mapped_column(String(64))  # original file, see ingestion/storage.py
     issued_at: Mapped[date | None] = mapped_column(Date)
     effective_from: Mapped[date | None] = mapped_column(Date)
     effective_until: Mapped[date | None] = mapped_column(Date)

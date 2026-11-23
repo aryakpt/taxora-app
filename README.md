@@ -61,6 +61,21 @@ Open the Vite URL, then register an account or sign in. Sessions use an HTTP-onl
 
 The API and frontend run natively for fast reloads and debugging; Docker is only used for the database. A production API image is not defined yet.
 
+## Knowledge base ingestion
+
+```text
+queued ─▶ processing ─▶ review_required ─(reviewer)─▶ approved ─(admin)─▶ published
+              └───────▶ failed ─(admin retry)─▶ queued
+```
+
+- **Submit** (admin): `POST /api/v1/admin/ingestion` with an official PDF link, or `POST /api/v1/admin/ingestion/upload` (multipart: PDF plus the same metadata fields). Metadata (type, number, title, issuer, topic, dates) is entered by people, never inferred. The request returns `202` and processing continues in the background; poll `GET /api/v1/admin/ingestion/{id}`.
+- **Sources**: links must be `https` on `INGESTION_ALLOWED_HOSTS` (default: peraturan.bpk.go.id, jdih.kemenkeu.go.id, pajak.go.id). Every redirect is re-checked and downloads are capped at `MAX_UPLOAD_BYTES`. Use the direct PDF link (on BPK: the `/Download/...pdf` link, not the `/Details/...` page).
+- **Processing**: the original PDF is stored by SHA-256 under `DOCUMENT_STORAGE_DIR` (`backend/storage/documents`, git-ignored); text is extracted (page-number lines removed), split into preamble, one section per `Pasal` (including Roman-numbered amendment articles), and attachments (`LAMPIRAN`), chunked, and embedded locally.
+- **Idempotent**: one regulation per type + number. Resubmitting an identical file reuses the existing version; a changed file becomes a new version of the same regulation.
+- **Review**: `POST .../{id}/approve` (reviewer or admin) after checking text and metadata against the source, then `POST .../{id}/publish` (admin). Only published versions are used by chat and the regulation library. `POST .../{id}/retry` re-runs a failed job without downloading the stored file again. Each step is written to `audit_logs`.
+- **Limits**: scanned PDFs without a text layer fail (no OCR yet). pypdf occasionally splits a word (about 1 in 200 occurrences on PMK 28/2026). Jobs run inside the API process; a restart marks unfinished jobs failed (retryable). Paragraph (ayat) level structure and regulation relations are not extracted yet.
+- **Retrieval tuning** (`RETRIEVAL_MAX_COSINE_DISTANCE=0.7`, `RETRIEVAL_KEYWORD_WEIGHT=0.1`): measured on 6 questions against PMK 28/2026, the expected article was in the top 5 for all 6 and an off-topic question returned nothing; with equal keyword weight, only 3 of 6. Re-tune on the evaluation dataset as documents are added.
+
 ## AI and chat safety
 
 - **Embeddings** (finding relevant articles) run locally with `fastembed` and the multilingual model `paraphrase-multilingual-MiniLM-L12-v2` (384 dimensions). No text leaves the server for search. Changing the model requires re-indexing every chunk.
@@ -99,7 +114,7 @@ Deployment and CI/CD are not configured yet. When a hosting platform is chosen, 
 - Conversation list/detail, published regulation listing, and administrator ingestion routes are connected to the backend. The UI does not invent regulations, sources, or successful answers.
 - Backend conversation detail currently returns message content and metadata but not source records; therefore reloaded history cannot restore citation cards or per-message feedback state. A successful chat fetches its assistant message ID for feedback because the chat response returns a request ID rather than message ID.
 - `LLM_API_KEY` is a server-side credential configured by the operator; users never supply provider keys. `LLM_DATA_POLICY` controls which OpenRouter providers may receive prompts: `no_training` (default; providers may not train on or sell prompts but may retain them for a time), `zero_retention` (no retention at all; as of November 2026 no free model qualifies, so it needs a paid model), or `any`. Review this before handling real user data. If no provider matches the policy, the chat returns a `failed` status. Authentication currently uses first-party email/password accounts; use HTTPS, secure cookies, rate limiting, and a security review before public launch.
-- Backend upload currently rejects document uploads after validation, and the ingestion endpoint processes synchronously. This frontend exposes URL ingestion only, matching the functional endpoint available now.
-- Ingestion status is visible in the admin screen, but approval/publication actions, audit history, evaluation results, and regulation-version editing are not yet exposed in the frontend.
+- The frontend exposes URL ingestion only; PDF upload (`POST /api/v1/admin/ingestion/upload`) is available in the API.
+- Ingestion status is visible in the admin screen, but approve/publish/retry, audit history, evaluation results, and regulation-version editing are not yet exposed in the frontend; use the API (`/docs`).
 - The source library contains only published regulations returned by the backend; it does not seed sample legal data. No evaluation scores or verified legal coverage are claimed.
 - The backend returns an unavailable evaluation status until a reviewed evaluation dataset exists. RAG quality, legal verification, production auth hardening, and broader PRD features remain incomplete.

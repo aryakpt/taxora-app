@@ -15,6 +15,7 @@ os.environ["LLM_API_KEY"] = ""  # tests never call a real provider; see the fake
 import httpx  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 
+from app.core.config import settings  # noqa: E402
 from app.core.database import engine  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
 from app.main import app  # noqa: E402
@@ -61,6 +62,13 @@ async def clean_database(migrated_database):
 @pytest.fixture(autouse=True)
 def reset_rate_limits():
     limiter.reset()
+
+
+@pytest.fixture(autouse=True)
+def document_storage(tmp_path, monkeypatch):
+    """Original documents go to a per-test temporary folder, never to backend/storage."""
+    monkeypatch.setattr(settings, "document_storage_dir", tmp_path / "documents")
+    return tmp_path / "documents"
 
 
 @pytest.fixture(autouse=True)
