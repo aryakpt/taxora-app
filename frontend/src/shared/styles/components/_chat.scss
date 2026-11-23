@@ -1,0 +1,5 @@
+// Chat answer states that are not in the legacy stylesheet.
+@use '../abstracts/tokens' as *;
+
+// An answer from the model's general knowledge: readable, but visibly not backed by a regulation.
+.answer-status.general_answer { background: #eef4fb; color: #3d5f80; }

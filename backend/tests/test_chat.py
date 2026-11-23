@@ -93,7 +93,13 @@ async def test_valid_cited_answer_is_returned_with_verbatim_source_quote(client,
     assert "<question>" in llm.calls[0][1] and "Berapa tarif pajak atas sewa?" in llm.calls[0][1]
 
 
-async def test_fabricated_quote_leads_to_insufficient_evidence(client, fake_ai):
+@pytest.fixture
+def strict_mode(monkeypatch):
+    """Only answers backed by quoted regulations (CHAT_ALLOW_GENERAL_ANSWERS=false)."""
+    monkeypatch.setattr(settings, "chat_allow_general_answers", False)
+
+
+async def test_strict_mode_turns_a_fabricated_quote_into_insufficient_evidence(client, fake_ai, strict_mode):
     chunk_id = await seed_fixture_regulation()
     fake_ai.enable_llm(llm_answer(chunk_id, quote="dipotong pajak sebesar dua puluh persen dari bruto"))
     await sign_in(client)
@@ -102,6 +108,43 @@ async def test_fabricated_quote_leads_to_insufficient_evidence(client, fake_ai):
 
     assert body["answer_status"] == "insufficient_evidence"
     assert body["sources"] == []
+
+
+async def test_an_unverified_answer_is_shown_as_general_knowledge_without_sources(client, fake_ai):
+    chunk_id = await seed_fixture_regulation()
+    fake_ai.enable_llm(llm_answer(chunk_id, quote="dipotong pajak sebesar dua puluh persen dari bruto",
+                                  answer="Menurut pengetahuan umum, sewa dipotong PPh 23.",
+                                  limitations=["Tarif bisa berubah."]))
+    await sign_in(client)
+
+    body = await ask(client, "Berapa tarif pajak atas sewa?", response_language="id")
+
+    assert body["answer_status"] == "general_answer"
+    assert body["answer"] == "Menurut pengetahuan umum, sewa dipotong PPh 23."
+    assert body["sources"] == [] and body["claims"] == []  # the invented quote is never shown as a source
+    assert body["limitations"][0].startswith("Jawaban ini berasal dari pengetahuan umum AI")
+    assert "Tarif bisa berubah." in body["limitations"]
+
+
+async def test_tax_questions_without_any_evidence_still_get_a_general_answer(client, fake_ai):
+    llm = fake_ai.enable_llm(json.dumps({"in_scope": True, "answer": "PPN adalah pajak atas konsumsi.",
+                                         "claims": [], "missing_information": [], "limitations": []}))
+    await sign_in(client)
+
+    body = await ask(client, "Apa itu PPN?")
+
+    assert body["answer_status"] == "general_answer" and body["answer"] == "PPN adalah pajak atas konsumsi."
+    assert "No evidence was found" in llm.calls[0][1]
+    assert "general knowledge" in llm.calls[0][0]  # the general-answer rules were used
+
+
+async def test_off_topic_questions_are_still_refused_with_general_answers_on(client, fake_ai):
+    llm = fake_ai.enable_llm(json.dumps({"in_scope": True, "answer": "Resep rendang: ..."}))
+    await sign_in(client)
+
+    body = await ask(client, "Bagaimana resep rendang yang enak?")
+
+    assert body["answer_status"] == "out_of_scope" and llm.calls == []
 
 
 async def test_llm_out_of_scope_verdict_replaces_its_answer(client, fake_ai):
@@ -132,8 +175,18 @@ async def test_unpublished_documents_are_never_used_as_evidence(client, fake_ai)
 
     body = await ask(client, "Berapa tarif pajak atas sewa?")
 
-    assert body["answer_status"] == "insufficient_evidence"
-    assert llm.calls == []
+    assert body["answer_status"] == "insufficient_evidence" and body["sources"] == []
+    assert FIXTURE_TEXT not in llm.calls[0][1] and "No evidence was found" in llm.calls[0][1]
+
+
+async def test_strict_mode_does_not_call_the_llm_without_evidence(client, fake_ai, strict_mode):
+    await seed_fixture_regulation(status="review_required")
+    llm = fake_ai.enable_llm()
+    await sign_in(client)
+
+    body = await ask(client, "Berapa tarif pajak atas sewa?")
+
+    assert body["answer_status"] == "insufficient_evidence" and llm.calls == []
 
 
 async def test_answer_trace_is_stored_without_the_prompt(client, fake_ai):
@@ -180,8 +233,8 @@ async def test_a_year_in_the_question_selects_the_rules_of_that_year(client, fak
     before = await ask(client, "Berapa tarif pajak atas sewa untuk tahun pajak 2025?")
     current = await ask(client, "Berapa tarif pajak atas sewa?")
 
-    assert before["answer_status"] == "insufficient_evidence" and len(llm.calls) == 1
-    assert current["answer_status"] == "answered"
+    assert before["sources"] == [] and FIXTURE_TEXT not in llm.calls[0][1]  # not in force in 2025
+    assert current["answer_status"] == "answered" and FIXTURE_TEXT in llm.calls[1][1]
     assert (await stored_answer()).metadata_json["reference_date"] == date.today().isoformat()
 
 

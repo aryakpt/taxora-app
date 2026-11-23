@@ -11,6 +11,7 @@ interface Props {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  general_answer: 'messages.generalAnswer',
   insufficient_evidence: 'messages.insufficientEvidence',
   clarification_needed: 'messages.clarificationNeeded',
   out_of_scope: 'messages.outOfScope',
