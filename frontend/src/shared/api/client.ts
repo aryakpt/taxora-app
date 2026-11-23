@@ -9,6 +9,12 @@ export class ApiError extends Error {
   }
 }
 
+/** FastAPI sends a string for handled errors and a list of field errors for validation (422). */
+function describeDetail(detail: string | { msg?: string }[] | undefined): string | undefined {
+  if (Array.isArray(detail)) return detail.map(item => item.msg?.replace(/^Value error, /, '')).filter(Boolean).join('; ')
+  return detail
+}
+
 function createHttpClient(): AxiosInstance {
   const client = axios.create({
     baseURL: API_URL,
@@ -19,8 +25,8 @@ function createHttpClient(): AxiosInstance {
 
   client.interceptors.response.use(
     response => response,
-    (error: AxiosError<{ detail?: string }>) => {
-      const message = error.response?.data?.detail || error.message || 'The API request failed.'
+    (error: AxiosError<{ detail?: string | { msg?: string }[] }>) => {
+      const message = describeDetail(error.response?.data?.detail) || error.message || 'The API request failed.'
       return Promise.reject(new ApiError(message, error.response?.status))
     },
   )

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import type { ApiRequest } from '../shared/api/client'
+import { canReview, useAuth } from '../shared/auth/AuthProvider'
 import type { ChatMessage, FeedbackRating } from '../shared/types/tax'
 import { TaxAssistantPage } from '../features/tax-assistant/pages/TaxAssistantPage'
 import { KnowledgeAdminPage } from '../features/knowledge-admin/pages/KnowledgeAdminPage'
@@ -17,10 +18,11 @@ interface Props {
 }
 
 export function AppRouter({ request, messages, busy, error, feedback, setError, onSend, onFeedback }: Props) {
+  const { user } = useAuth()
   return <Routes>
     <Route path="/" element={<TaxAssistantPage messages={messages} busy={busy} error={error} feedback={feedback} onSend={onSend} onFeedback={onFeedback} onDismissError={() => setError('')} />} />
     <Route path="/regulations" element={<RegulationLibraryPage request={request} error={error} setError={setError} />} />
-    <Route path="/admin" element={<KnowledgeAdminPage request={request} error={error} setError={setError} />} />
+    {canReview(user) && <Route path="/admin" element={<KnowledgeAdminPage request={request} />} />}
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 }

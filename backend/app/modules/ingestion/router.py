@@ -1,14 +1,14 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Response, status
 
 from app.core.config import settings
 from app.core.database import SessionDep
 from app.modules.auth.dependencies import AdminUser, ReviewerUser
 from app.modules.ingestion import service, storage
 from app.modules.ingestion.models import IngestionJob
-from app.modules.ingestion.schemas import RegulationMetadata, UploadForm
+from app.modules.ingestion.schemas import RegulationMetadata, UploadForm, VersionDates
 
 router = APIRouter(prefix="/api/v1/admin/ingestion", tags=["admin"])
 
@@ -59,6 +59,33 @@ async def get_job(job_id: uuid.UUID, session: SessionDep, user: ReviewerUser):
     return await service.describe(session, await _job_or_404(session, job_id))
 
 
+@router.get("/{job_id}/provisions")
+async def get_provisions(job_id: uuid.UUID, session: SessionDep, user: ReviewerUser):
+    """Extracted sections, so the reviewer can compare them with the original document."""
+    try:
+        return await service.provisions(session, job_id)
+    except service.JobNotFound as exc:
+        raise HTTPException(404, "Job tidak ditemukan") from exc
+
+
+@router.get("/{job_id}/document")
+async def get_document(job_id: uuid.UUID, session: SessionDep, user: ReviewerUser):
+    """The stored original PDF. Sent as a download, never rendered inline from the API origin."""
+    job = await _job_or_404(session, job_id)
+    if not job.storage_key:
+        raise HTTPException(404, "Dokumen asli belum tersimpan")
+    filename = "".join(c for c in (job.filename or "dokumen.pdf") if c.isalnum() or c in "._- ")[:100] or "dokumen.pdf"
+    try:
+        content = storage.load(job.storage_key)
+    except FileNotFoundError as exc:
+        raise HTTPException(404, "Dokumen asli tidak ditemukan di penyimpanan") from exc
+    return Response(content, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, no-store",
+    })
+
+
 async def _transition(action, session, job_id: uuid.UUID, user):
     try:
         job = await action(session, job_id, user)
@@ -79,6 +106,12 @@ async def approve(job_id: uuid.UUID, session: SessionDep, user: ReviewerUser):
 async def publish(job_id: uuid.UUID, session: SessionDep, user: AdminUser):
     """Make an approved version available to retrieval and the regulation library."""
     return await _transition(service.publish, session, job_id, user)
+
+
+@router.put("/{job_id}/dates")
+async def update_dates(job_id: uuid.UUID, body: VersionDates, session: SessionDep, user: ReviewerUser):
+    """Set the issued and effective dates while the version is under review."""
+    return await _transition(lambda s, j, u: service.update_dates(s, j, u, body), session, job_id, user)
 
 
 @router.post("/{job_id}/retry", status_code=status.HTTP_202_ACCEPTED)

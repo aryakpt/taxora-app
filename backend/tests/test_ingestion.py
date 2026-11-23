@@ -104,6 +104,51 @@ async def test_status_changes_must_follow_the_workflow(client, source):
     assert (await client.post(f"{base}/retry")).status_code == 409     # not failed
 
 
+async def test_reviewer_corrects_dates_only_while_under_review(client, source):
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client, effective_from=None)
+    base = f"/api/v1/admin/ingestion/{job['id']}"
+    dates = {"issued_at": "2026-04-20", "effective_from": "2026-05-01", "effective_until": None}
+
+    await sign_in_as(client, "user@example.com", UserRole.user)
+    assert (await client.put(f"{base}/dates", json=dates)).status_code == 403
+
+    await sign_in_as(client, "reviewer@example.com", UserRole.reviewer)
+    updated = await client.put(f"{base}/dates", json=dates)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["version"]["effective_from"] == "2026-05-01"
+    assert updated.json()["version"]["issued_at"] == "2026-04-20"
+    backwards = {"effective_from": "2026-05-01", "effective_until": "2026-01-01"}
+    assert (await client.put(f"{base}/dates", json=backwards)).status_code == 422
+
+    assert (await client.post(f"{base}/approve")).status_code == 200
+    assert (await client.put(f"{base}/dates", json=dates)).status_code == 409  # frozen after approval
+    async with SessionLocal() as session:
+        actions = (await session.scalars(select(AuditLog.action))).all()
+    assert "ingestion.dates_updated" in actions
+
+
+async def test_reviewer_can_read_extracted_sections_and_the_original(client, source):
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client)
+    base = f"/api/v1/admin/ingestion/{job['id']}"
+
+    await sign_in_as(client, "reviewer@example.com", UserRole.reviewer)
+    sections = (await client.get(f"{base}/provisions")).json()
+    assert [(s["kind"], s["number"], s["chunks"]) for s in sections] == [
+        ("preamble", None, 1), ("article", "1", 1), ("article", "2", 1)]
+    assert sections[1]["text"].startswith("Atas penghasilan berupa sewa")
+
+    document = await client.get(f"{base}/document")
+    assert document.status_code == 200 and document.content == PDF
+    assert document.headers["content-disposition"].startswith("attachment")
+    assert (await client.get("/api/v1/admin/ingestion/00000000-0000-0000-0000-000000000000/provisions")).status_code == 404
+
+    await sign_in_as(client, "user@example.com", UserRole.user)
+    assert (await client.get(f"{base}/provisions")).status_code == 403
+    assert (await client.get(f"{base}/document")).status_code == 403
+
+
 async def test_only_admins_submit_and_regular_users_see_nothing(client, source):
     await sign_in_as(client, "user@example.com", UserRole.user)
     assert (await client.post("/api/v1/admin/ingestion", json=METADATA)).status_code == 403

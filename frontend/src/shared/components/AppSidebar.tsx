@@ -1,7 +1,7 @@
 import { BookOpen, History, LogOut, MessageSquarePlus, Plus, Search, Settings, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import type { AuthUser } from '../auth/AuthProvider'
+import { canReview, type AuthUser } from '../auth/AuthProvider'
 import type { ConversationSummary } from '../types/tax'
 
 interface Props {
@@ -25,7 +25,7 @@ export function AppSidebar({ activeConversation, conversations, user, mobileOpen
       <nav className="primary-nav" aria-label={t('navigation.workspace')}>
         <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Sparkles size={17} /><span>{t('navigation.taxAssistant')}</span></NavLink>
         <NavLink to="/regulations" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><BookOpen size={17} /><span>{t('navigation.regulationLibrary')}</span></NavLink>
-        {user.role === 'admin' && <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Settings size={17} /><span>{t('navigation.knowledgeAdmin')}</span></NavLink>}
+        {canReview(user) && <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Settings size={17} /><span>{t('navigation.knowledgeAdmin')}</span></NavLink>}
       </nav>
       <div className="history-heading"><span>{t('navigation.recent')}</span><button aria-label={t('navigation.searchConversations')} title={t('navigation.searchConversations')} className="icon-btn"><Search size={15} /></button></div>
       <div className="history-list">{conversations.length ? conversations.map(item => <button key={item.id} className={`history-item ${activeConversation === item.id ? 'selected' : ''}`} onClick={() => onOpenConversation(item.id)}><History size={15} /><span>{item.title}</span></button>) : <p className="history-empty">{t('navigation.emptyHistory')}</p>}</div>
