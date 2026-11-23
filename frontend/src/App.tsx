@@ -1,4 +1,4 @@
-import {useMemo, useState} from 'react';
+import {useMemo, useState, type CSSProperties} from 'react';
 import {useTranslation} from 'react-i18next';
 import {useNavigate} from 'react-router-dom';
 import {AppHeader} from './shared/components/AppHeader';
@@ -8,6 +8,7 @@ import {createApiClient} from './shared/api/client';
 import {useChat} from './features/tax-assistant/hooks/useChat';
 import {useConversations} from './features/tax-assistant/hooks/useConversations';
 import {AuthPage} from './shared/auth/pages/AuthPage';
+import {useSidebarWidth} from './shared/hooks/useSidebarWidth';
 import {useAuth} from './shared/auth/AuthProvider';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
   const navigate = useNavigate();
   const history = useConversations(request, auth.user?.id || '');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebar = useSidebarWidth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [error, setError] = useState('');
 
@@ -83,7 +85,7 @@ export default function App() {
   if (!auth.user) return <AuthPage />;
 
   return (
-    <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+    <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`} style={{'--sidebar-width': `${sidebar.width}px`} as CSSProperties}>
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
@@ -97,6 +99,9 @@ export default function App() {
         onRenameConversation={renameConversation}
         onDeleteConversation={deleteConversation}
         onSignOut={() => void signOut()}
+        width={sidebar.width}
+        onResize={sidebar.resize}
+        onResizeEnd={sidebar.save}
         onCloseMobile={() => setMobileNavOpen(false)}
       />
       <main id="main-content" className="main-area">
