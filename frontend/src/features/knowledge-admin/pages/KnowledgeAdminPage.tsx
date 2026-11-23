@@ -1,39 +1,55 @@
-import { useEffect, useState } from 'react'
-import { Check, Settings } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
+import { Check, Settings, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ApiRequest } from '../../../shared/api/client'
+import { useAuth } from '../../../shared/auth/AuthProvider'
 import type { IngestionJob } from '../../../shared/types/tax'
-import { createIngestionApi } from '../api/ingestionApi'
-import { IngestionForm, type IngestionFormValues } from '../components/IngestionForm'
+import { createIngestionApi, type RegulationMetadata } from '../api/ingestionApi'
+import { IngestionForm } from '../components/IngestionForm'
 import { IngestionJobList } from '../components/IngestionJobList'
+import { JobReviewPanel } from '../components/JobReviewPanel'
+import { useIngestionJobs } from '../hooks/useIngestionJobs'
 
-interface Props { request: ApiRequest; error: string; setError: (error: string) => void }
+interface Props { request: ApiRequest }
 
-export function KnowledgeAdminPage({ request, error, setError }: Props) {
+export function KnowledgeAdminPage({ request }: Props) {
   const { t } = useTranslation()
-  const [jobs, setJobs] = useState<IngestionJob[]>([])
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'admin'
+  const api = useMemo(() => createIngestionApi(request), [request])
+  const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
-  useEffect(() => {
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const showError = useCallback((message: string) => { setNotice(''); setError(message) }, [])
+  const { jobs, loading, processing, refresh, replace } = useIngestionJobs(api, showError)
+  const selected = jobs.find(job => job.id === selectedId) ?? null
+
+  function changed(job: IngestionJob, message: string) {
+    replace(job)
     setError('')
-    createIngestionApi(request).list().then(setJobs).catch((cause: Error) => setError(cause.message))
-  }, [request, setError])
-  async function submit(values: IngestionFormValues) {
-    try {
-      await createIngestionApi(request).submit({ ...values, issued_at: null, effective_from: null, effective_until: null, is_internal: false, allowed_user_ids: [] })
-      setNotice(t('admin.submitted'))
-      setJobs(await createIngestionApi(request).list())
-    } catch (submissionError) { setError((submissionError as Error).message) }
+    setNotice(message)
   }
-  async function refreshJobs() {
-    try { setJobs(await createIngestionApi(request).list()) }
-    catch (refreshError) { setError((refreshError as Error).message) }
+
+  async function submit(metadata: RegulationMetadata, file: File | null) {
+    try {
+      const job = file ? await api.upload(metadata, file) : await api.submitUrl(metadata)
+      changed(job, t('admin.submitted'))
+      setSelectedId(job.id)
+      return true
+    } catch (submissionError) {
+      showError((submissionError as Error).message)
+      return false
+    }
   }
 
   return <section className="page-panel admin-panel">
-    <div className="page-kicker"><Settings size={16} /> {t('admin.eyebrow')}</div><h1>{t('admin.title')}</h1>
-    <p className="page-intro">{t('admin.intro')}</p>
-    {notice && <div className="success-banner"><Check size={15} />{notice}</div>}{error && <div className="error-banner" role="alert">{error}</div>}
-    <IngestionForm onSubmit={submit} />
-    <IngestionJobList jobs={jobs} onRefresh={refreshJobs} />
+    <div className="page-kicker"><Settings size={16} /> {t('admin.eyebrow')}</div>
+    <h1>{t('admin.title')}</h1>
+    <p className="page-intro">{isAdmin ? t('admin.intro') : t('admin.reviewerIntro')}</p>
+    {notice && <div className="success-banner" role="status"><Check size={15} />{notice}</div>}
+    {error && <div className="error-banner" role="alert">{error}<button onClick={() => setError('')} aria-label={t('common.close')}><X size={14} /></button></div>}
+    {isAdmin && <IngestionForm onSubmit={submit} />}
+    <IngestionJobList jobs={jobs} loading={loading} processing={processing} selectedId={selectedId} onSelect={setSelectedId} onRefresh={() => void refresh()} />
+    {selected && <JobReviewPanel key={selected.id} job={selected} api={api} isAdmin={isAdmin} onChanged={changed} onError={showError} onClose={() => setSelectedId(null)} />}
   </section>
 }

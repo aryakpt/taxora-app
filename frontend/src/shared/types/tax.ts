@@ -40,12 +40,36 @@ export interface Regulation {
   source_url: string
 }
 
+export type JobStatus = 'queued' | 'processing' | 'review_required' | 'approved' | 'published' | 'failed'
+
 export interface IngestionJob {
   id: string
+  status: JobStatus
   source_url: string
-  status: string
-  error?: string | null
-  created_at?: string
+  filename: string | null
+  error: string | null
+  detail: string | null
+  created_at: string
+  updated_at: string
+  storage_available: boolean
+  regulation: { id: string; type: string; number: string; title: string; issuer: string; topic: string } | null
+  version: {
+    id: string
+    status: JobStatus
+    document_hash: string
+    issued_at: string | null
+    effective_from: string | null
+    effective_until: string | null
+    verified_at: string | null
+  } | null
+}
+
+export interface ExtractedSection {
+  id: string
+  kind: 'preamble' | 'article' | 'attachment'
+  number: string | null
+  text: string
+  chunks: number
 }
 
 export interface ChatResponse {

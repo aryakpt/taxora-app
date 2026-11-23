@@ -11,7 +11,7 @@ import logging
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -22,7 +22,7 @@ from app.modules.generation import providers
 from app.modules.ingestion import sources, storage
 from app.modules.ingestion.extraction import ExtractionError, chunks, extract_text, structural_sections
 from app.modules.ingestion.models import IngestionJob, JobStatus
-from app.modules.ingestion.schemas import RegulationMetadata
+from app.modules.ingestion.schemas import RegulationMetadata, VersionDates
 from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
 logger = logging.getLogger("taxora.ingestion")
@@ -231,6 +231,19 @@ async def retry(session: AsyncSession, job_id: uuid.UUID, user: User) -> Ingesti
     return job
 
 
+async def update_dates(session: AsyncSession, job_id: uuid.UUID, user: User, dates: VersionDates) -> IngestionJob:
+    """Correct the dates while the version is under review. After approval they are frozen, because the
+    reviewer's approval covers them; a wrong date after that needs a new ingestion."""
+    job, version = await _job_and_version(session, job_id)
+    if version is None or version.status != JobStatus.review_required.value:
+        raise InvalidTransition("Tanggal hanya bisa diubah saat dokumen berstatus review_required.")
+    version.issued_at, version.effective_from, version.effective_until = (
+        dates.issued_at, dates.effective_from, dates.effective_until)
+    session.add(AuditLog(actor_id=user.id, action="ingestion.dates_updated", resource_id=str(job.id)))
+    await session.flush()
+    return job
+
+
 # --- read models -------------------------------------------------------------------------------
 
 async def describe(session: AsyncSession, job: IngestionJob) -> dict:
@@ -245,12 +258,36 @@ async def describe(session: AsyncSession, job: IngestionJob) -> dict:
         "detail": job.detail,
         "created_at": job.created_at,
         "updated_at": job.updated_at,
+        "storage_available": bool(job.storage_key),
         "regulation": {"id": regulation.id, "type": regulation.regulation_type,
-                       "number": regulation.regulation_number, "title": regulation.title} if regulation else None,
+                       "number": regulation.regulation_number, "title": regulation.title,
+                       "issuer": regulation.issuer, "topic": regulation.topic} if regulation else None,
         "version": {"id": version.id, "status": version.status, "document_hash": version.document_hash,
-                    "effective_from": version.effective_from, "effective_until": version.effective_until,
-                    "verified_at": version.verified_at} if version else None,
+                    "issued_at": version.issued_at, "effective_from": version.effective_from,
+                    "effective_until": version.effective_until, "verified_at": version.verified_at}
+        if version else None,
     }
+
+
+async def provisions(session: AsyncSession, job_id: uuid.UUID) -> list[dict]:
+    """The extracted sections of the job's version, in document order, for the reviewer to check."""
+    job = await session.get(IngestionJob, job_id)
+    if job is None:
+        raise JobNotFound
+    if job.version_id is None:
+        return []
+    chunk_counts = (
+        select(DocumentChunk.provision_id, func.count().label("total"))
+        .group_by(DocumentChunk.provision_id).subquery()
+    )
+    rows = (await session.execute(
+        select(LegalProvision, func.coalesce(chunk_counts.c.total, 0))
+        .outerjoin(chunk_counts, chunk_counts.c.provision_id == LegalProvision.id)
+        .where(LegalProvision.version_id == job.version_id)
+        .order_by(LegalProvision.ordinal)
+    )).all()
+    return [{"id": p.id, "kind": p.provision_type, "number": p.article_number, "text": p.text, "chunks": total}
+            for p, total in rows]
 
 
 async def list_jobs(session: AsyncSession) -> list[dict]:

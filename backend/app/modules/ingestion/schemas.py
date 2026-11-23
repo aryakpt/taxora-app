@@ -32,7 +32,7 @@ class RegulationMetadata(BaseModel):
     @model_validator(mode="after")
     def coherent(self) -> "RegulationMetadata":
         if self.effective_from and self.effective_until and self.effective_until < self.effective_from:
-            raise ValueError("effective_until tidak boleh sebelum effective_from")
+            raise ValueError("Tanggal berlaku sampai tidak boleh sebelum tanggal berlaku mulai")
         if self.allowed_user_ids and not self.is_internal:
             raise ValueError("allowed_user_ids hanya berlaku untuk dokumen internal")
         return self
@@ -45,6 +45,20 @@ class RegulationMetadata(BaseModel):
             "is_internal": self.is_internal,
             "allowed_user_ids": [str(user_id) for user_id in self.allowed_user_ids],
         }
+
+
+class VersionDates(BaseModel):
+    """Dates a reviewer confirms against the official text. All three are replaced together."""
+
+    issued_at: date | None = None
+    effective_from: date | None = None
+    effective_until: date | None = None
+
+    @model_validator(mode="after")
+    def coherent(self) -> "VersionDates":
+        if self.effective_from and self.effective_until and self.effective_until < self.effective_from:
+            raise ValueError("Tanggal berlaku sampai tidak boleh sebelum tanggal berlaku mulai")
+        return self
 
 
 class UploadForm(RegulationMetadata):

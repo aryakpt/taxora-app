@@ -8,6 +8,11 @@ export interface AuthUser {
   role: string
 }
 
+/** Reviewers check extracted documents; admins can also submit and publish them. */
+export function canReview(user: AuthUser | null) {
+  return user?.role === 'reviewer' || user?.role === 'admin'
+}
+
 interface Credentials { email: string; password: string }
 interface Registration extends Credentials { full_name: string }
 
