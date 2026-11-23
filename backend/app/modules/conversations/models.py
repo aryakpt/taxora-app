@@ -25,3 +25,12 @@ class Message(Base):
     content: Mapped[str] = mapped_column(Text)
     metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    @classmethod
+    def chronological(cls, newest_first: bool = False):
+        """A question and its answer are written in one transaction, so they share created_at (now() is
+        the transaction start). Within a request the question comes first: "user" sorts after
+        "assistant", so role descending puts it first."""
+        if newest_first:
+            return cls.created_at.desc(), cls.role.asc()
+        return cls.created_at.asc(), cls.role.desc()

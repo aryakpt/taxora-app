@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import Protocol
 
 import openai
@@ -16,10 +17,16 @@ class LLMError(Exception):
     """The provider failed, timed out, or returned no content."""
 
 
+@dataclass(frozen=True)
+class LLMReply:
+    text: str
+    model: str  # the model that actually answered; a router such as openrouter/free picks one per request
+
+
 class LLMClient(Protocol):
     model: str
 
-    async def complete_json(self, system: str, user: str) -> str: ...
+    async def complete_json(self, system: str, user: str) -> LLMReply: ...
 
 
 class OpenAICompatibleLLM:
@@ -29,16 +36,20 @@ class OpenAICompatibleLLM:
         self.model = model
         self._base_url = base_url
         self._client = AsyncOpenAI(
-            api_key=api_key, base_url=base_url, timeout=settings.llm_timeout_seconds, max_retries=1
+            # Retries happen in the chat service, where each one is recorded and may reach another model.
+            api_key=api_key, base_url=base_url, timeout=settings.llm_timeout_seconds, max_retries=0
         )
 
     def _extra_body(self) -> dict | None:
-        """OpenRouter provider-routing filter for settings.llm_data_policy."""
+        """OpenRouter-only request options: the data policy filter and the reasoning effort."""
         if "openrouter.ai" not in self._base_url:
             return None
-        return _OPENROUTER_DATA_POLICIES[settings.llm_data_policy]
+        body = dict(_OPENROUTER_DATA_POLICIES[settings.llm_data_policy] or {})
+        if settings.llm_reasoning_effort:
+            body["reasoning"] = {"effort": settings.llm_reasoning_effort}
+        return body or None
 
-    async def complete_json(self, system: str, user: str) -> str:
+    async def complete_json(self, system: str, user: str) -> LLMReply:
         try:
             completion = await self._client.chat.completions.create(
                 model=self.model,
@@ -50,7 +61,11 @@ class OpenAICompatibleLLM:
             )
         except openai.OpenAIError as exc:
             raise LLMError(type(exc).__name__) from exc
-        content = completion.choices[0].message.content if completion.choices else None
+        choice = completion.choices[0] if completion.choices else None
+        content = choice.message.content if choice else None
+        # Reasoning models can spend the whole token budget thinking and return nothing, or stop mid-JSON.
+        if choice and choice.finish_reason == "length":
+            raise LLMError(f"completion truncated at max tokens ({len(content or '')} chars of answer)")
         if not content:
             raise LLMError("empty completion")
-        return content
+        return LLMReply(content, completion.model or self.model)

@@ -50,10 +50,13 @@ async def hybrid_search(
     user_id: uuid.UUID,
     tax_period: str | None,
     embedder: Embedder,
+    statuses: tuple[str, ...] = ("published",),
 ) -> list[dict]:
     """Keyword + vector search over published, effective, permitted chunks, fused with Reciprocal
     Rank Fusion. Each channel only returns chunks above its relevance threshold, so an unrelated
-    question returns no evidence instead of the "least bad" chunks."""
+    question returns no evidence instead of the "least bad" chunks.
+
+    `statuses` exists for offline evaluation of documents still under review; chat always uses the default."""
     reference_date = temporal_reference_date(tax_period)
     base = (
         select(
@@ -72,7 +75,7 @@ async def hybrid_search(
         .join(RegulationVersion, LegalProvision.version_id == RegulationVersion.id)
         .join(Regulation, RegulationVersion.regulation_id == Regulation.id)
         .where(
-            RegulationVersion.status == "published",
+            RegulationVersion.status.in_(statuses),
             RegulationVersion.effective_from.is_(None) | (RegulationVersion.effective_from <= reference_date),
             RegulationVersion.effective_until.is_(None) | (RegulationVersion.effective_until >= reference_date),
             RegulationVersion.is_internal.is_(False) | RegulationVersion.allowed_user_ids.contains([str(user_id)]),
@@ -112,6 +115,7 @@ async def hybrid_search(
             "text": row.chunk_text,
             "regulation": f"{row.regulation_number} — {row.title}",
             "article": f"Pasal {row.article_number}" if row.article_number else None,
+            "article_number": row.article_number,
             "paragraph": row.paragraph_number,
             "source_url": row.source_url,
             "status": row.status,

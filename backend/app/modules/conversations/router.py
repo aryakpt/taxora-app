@@ -24,7 +24,7 @@ async def conversation_detail(conversation_id: uuid.UUID, session: SessionDep, u
     if row is None or row.user_id != user.id:
         raise HTTPException(404, "Percakapan tidak ditemukan")
     messages = (await session.scalars(
-        select(Message).where(Message.conversation_id == row.id).order_by(Message.created_at)
+        select(Message).where(Message.conversation_id == row.id).order_by(*Message.chronological())
     )).all()
     return {
         "id": row.id,

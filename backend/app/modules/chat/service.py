@@ -3,15 +3,17 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.modules.auth.models import User
 from app.modules.chat.citations import GenerationResult, MalformedOutput, parse_and_validate
 from app.modules.chat.schemas import AnswerStatus, ChatRequest, ChatResponse, Claim, Source
 from app.modules.conversations.models import Conversation, Message
 from app.modules.generation import providers
-from app.modules.generation.llm import LLMError
-from app.modules.generation.prompts import PROMPT_VERSION, system_prompt, user_prompt
+from app.modules.generation.llm import LLMClient, LLMError
+from app.modules.generation.prompts import PROMPT_VERSION, Turn, system_prompt, user_prompt
 from app.modules.query_understanding.scope import assess_scope
 from app.modules.retrieval.service import hybrid_search
 
@@ -50,6 +52,10 @@ CHAT_COPY = {
 }
 
 
+# Earlier exchanges sent with a follow-up question, so "and the requirements?" can be resolved.
+HISTORY_EXCHANGES = 2
+
+
 @dataclass
 class Outcome:
     status: AnswerStatus
@@ -66,11 +72,12 @@ async def answer_question(body: ChatRequest, session: AsyncSession, user: User) 
     started = time.monotonic()
     request_id = uuid.uuid4()
     conversation = await _conversation_for(body, session, user)
+    history = await _history(session, conversation.id)
     session.add(Message(conversation_id=conversation.id, role="user", content=body.question,
                         metadata_json={"tax_period": body.context.tax_period, "taxpayer_type": body.context.taxpayer_type,
                                        "response_language": body.response_language}))
 
-    outcome = await _decide(body, session, user, request_id)
+    outcome = await _decide(body, session, user, request_id, history)
     if outcome.status not in (AnswerStatus.out_of_scope, AnswerStatus.failed) and not body.context.tax_period:
         outcome.missing.append(CHAT_COPY[body.response_language]["missing_period"])
 
@@ -92,6 +99,7 @@ async def _conversation_for(body: ChatRequest, session: AsyncSession, user: User
         conversation = await session.get(Conversation, body.conversation_id)
         if conversation is None or conversation.user_id != user.id:
             raise ConversationNotFound
+        conversation.updated_at = func.now()  # keeps the sidebar ordered by latest activity
         return conversation
     conversation = Conversation(user_id=user.id, title=body.question[:120])
     session.add(conversation)
@@ -99,16 +107,39 @@ async def _conversation_for(body: ChatRequest, session: AsyncSession, user: User
     return conversation
 
 
-async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_id: uuid.UUID) -> Outcome:
+async def _history(session: AsyncSession, conversation_id: uuid.UUID) -> list[Turn]:
+    """The last exchanges of the conversation, oldest first. Out-of-scope turns are left out, so an injected
+    question is never replayed into later prompts. Failed or unanswered turns stay: their question still
+    gives a follow-up its meaning, and their answer is one of Taxora's fixed messages."""
+    rows = (await session.scalars(
+        select(Message).where(Message.conversation_id == conversation_id)
+        .order_by(*Message.chronological(newest_first=True)).limit(HISTORY_EXCHANGES * 2)
+    )).all()
+    turns, pending_answer = [], None
+    for message in rows:  # newest first: each assistant message precedes its question
+        if message.role == "assistant":
+            pending_answer = message
+        elif pending_answer is not None:
+            if pending_answer.metadata_json.get("answer_status") != "out_of_scope":
+                turns.append(Turn(question=message.content, answer=pending_answer.content))
+            pending_answer = None
+    return list(reversed(turns))
+
+
+async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_id: uuid.UUID,
+                  history: list[Turn]) -> Outcome:
     """Scope guard → retrieval → LLM → citation validation. Each step can stop early."""
     copy = CHAT_COPY[body.response_language]
     embedder = providers.get_embedder()
-    scope = await assess_scope(body.question, embedder)
-    trace = {"scope": {"in_scope": scope.in_scope, "reason": scope.reason, "similarity": scope.similarity}}
+    # A follow-up ("bagaimana syaratnya?") is judged and searched together with the previous question.
+    search_text = f"{history[-1].question}\n{body.question}" if history else body.question
+    scope = await assess_scope(search_text, embedder)
+    trace = {"scope": {"in_scope": scope.in_scope, "reason": scope.reason, "similarity": scope.similarity},
+             "history_turns": len(history)}
     if not scope.in_scope:
         return Outcome(AnswerStatus.out_of_scope, copy["out_of_scope"], trace=trace)
 
-    evidence = await hybrid_search(session, body.question, user.id, body.context.tax_period, embedder)
+    evidence = await hybrid_search(session, search_text, user.id, body.context.tax_period, embedder)
     if not evidence:
         return Outcome(AnswerStatus.insufficient_evidence, copy["no_evidence"],
                        limitations=[copy["no_verified_evidence"]], trace=trace)
@@ -117,22 +148,36 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
         return Outcome(AnswerStatus.insufficient_evidence, copy["unconfigured"],
                        limitations=[copy["api_key_required"]], evidence=evidence, trace=trace)
 
-    trace["model"] = llm.model
+    prompt = user_prompt(body.question, evidence, body.context.tax_period, body.context.taxpayer_type,
+                         body.context.transaction_type, history)
     try:
-        raw = await llm.complete_json(
-            system_prompt(body.response_language),
-            user_prompt(body.question, evidence, body.context.tax_period,
-                        body.context.taxpayer_type, body.context.transaction_type),
-        )
-        result = parse_and_validate(raw, evidence)
-    except LLMError as exc:
-        logger.warning("llm call failed request_id=%s error=%s", request_id, exc)
+        result = await _generate(llm, system_prompt(body.response_language), prompt, evidence, request_id, trace)
+    except LLMError:
         return Outcome(AnswerStatus.failed, copy["llm_unavailable"], evidence=evidence, trace=trace)
-    except MalformedOutput as exc:
-        logger.warning("llm output rejected request_id=%s error=%s", request_id, exc)
+    except MalformedOutput:
         return Outcome(AnswerStatus.failed, copy["failed"], evidence=evidence, trace=trace)
     trace["rejected_claims"] = result.rejected_claims
     return _from_generation(result, evidence, copy, trace)
+
+
+async def _generate(llm: LLMClient, system: str, prompt: str, evidence: list[dict], request_id: uuid.UUID,
+                    trace: dict) -> GenerationResult:
+    """Ask the LLM, retrying when the reply is empty, truncated, or not the expected JSON. Records the
+    model that produced the accepted reply (or the last attempt) and every failed attempt."""
+    errors: list[str] = []
+    trace["model"] = llm.model
+    for attempt in range(1, max(1, settings.llm_attempts) + 1):
+        try:
+            reply = await llm.complete_json(system, prompt)
+            trace["model"] = reply.model
+            return parse_and_validate(reply.text, evidence)
+        except (LLMError, MalformedOutput) as exc:
+            errors.append(f"{type(exc).__name__}: {exc}"[:200])
+            trace["llm_errors"] = errors
+            logger.warning("llm attempt %s failed request_id=%s error=%s", attempt, request_id, exc)
+            if attempt >= settings.llm_attempts:
+                raise
+    raise AssertionError("unreachable")
 
 
 def _from_generation(result: GenerationResult, evidence: list[dict], copy: dict, trace: dict) -> Outcome:

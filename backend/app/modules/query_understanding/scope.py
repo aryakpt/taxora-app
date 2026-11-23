@@ -20,13 +20,17 @@ TAX_TERMS = re.compile(
     re.IGNORECASE,
 )
 
+# No country names: "Indonesia" in an anchor made every question about Indonesia look like tax
+# ("Siapa presiden pertama Indonesia?" scored 0.52). The last two cover tax questions in everyday words.
 ANCHORS = (
-    "Pertanyaan tentang Pajak Penghasilan (PPh) di Indonesia",
-    "Pertanyaan tentang Pajak Pertambahan Nilai (PPN) di Indonesia",
+    "Pertanyaan tentang Pajak Penghasilan (PPh)",
+    "Pertanyaan tentang Pajak Pertambahan Nilai (PPN)",
     "Tarif, subjek, objek, dan dasar pengenaan pajak",
     "Kewajiban perpajakan wajib pajak: NPWP, SPT, faktur pajak, bukti potong",
     "Peraturan perpajakan: undang-undang, PMK, peraturan Direktur Jenderal Pajak",
-    "Indonesian income tax and value added tax rules",
+    "Income tax and value added tax rules",
+    "Potongan atas gaji, honorarium, sewa, jasa, dan hadiah yang disetor ke negara",
+    "Pengembalian kelebihan pembayaran dan pelaporan penghasilan tahunan",
 )
 
 

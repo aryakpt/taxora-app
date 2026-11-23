@@ -81,7 +81,7 @@ def fake_ai(monkeypatch):
         llm = FakeLLM()
         llm_enabled = False
 
-        def enable_llm(self, response: str | Exception = "{}") -> FakeLLM:
+        def enable_llm(self, response: str | Exception | list = "{}") -> FakeLLM:
             self.llm_enabled, self.llm.response = True, response
             return self.llm
 

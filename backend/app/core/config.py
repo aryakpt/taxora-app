@@ -27,8 +27,18 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_base_url: str = "https://openrouter.ai/api/v1"
     llm_model: str = "openrouter/free"
-    llm_timeout_seconds: float = 45
-    llm_max_output_tokens: int = 1500
+    # Per attempt. Free models answered in 11-70 s on a 6k-token prompt (measured 2026-11-23).
+    llm_timeout_seconds: float = 60
+    # Reasoning models count their thinking against this budget. Raising it does not help: measured at 8000,
+    # models thought longer (65-178 s) and still ran out.
+    llm_max_output_tokens: int = 4000
+    # Attempts per question when the reply is empty, truncated, times out, or is not valid JSON. With
+    # openrouter/free each attempt may be served by a different model. Worst case per question:
+    # llm_attempts x llm_timeout_seconds, which the frontend's chat timeout must exceed.
+    llm_attempts: int = 2
+    # OpenRouter only. Every free model is a reasoning model and reasoning cannot be switched off there;
+    # "low" made replies faster (11-15 s instead of 24-40 s) and less often cut off. Empty to not send it.
+    llm_reasoning_effort: Literal["low", "medium", "high", ""] = "low"
     # OpenRouter only: which providers may receive prompts.
     #   zero_retention: providers must not store prompts at all (no free models qualify today)
     #   no_training:    providers must not train on or sell prompts, but may retain them for a time
@@ -47,7 +57,10 @@ class Settings(BaseSettings):
     # Weight of the keyword channel in rank fusion (vector = 1.0). Higher values let long chunks that
     # merely share common words ("pajak", "pengembalian") push out the best semantic match.
     retrieval_keyword_weight: float = 0.1
-    scope_min_similarity: float = 0.25  # calibrated on 16 sample questions only
+    # Calibrated on 10 tax questions without tax terms (lowest 0.368) and 15 off-topic ones (highest 0.422,
+    # "Berapa gaji UMR Jakarta?"). Set low on purpose: refusing a real tax question is worse than letting an
+    # off-topic one reach retrieval and the LLM's own scope rule.
+    scope_min_similarity: float = 0.33
     chat_requests_per_hour: int = 20
 
     # Ingestion. Source URLs must be https on one of these hosts (or their subdomains); redirects are

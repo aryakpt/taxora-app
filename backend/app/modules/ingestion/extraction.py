@@ -9,6 +9,9 @@ from pypdf.errors import PdfReadError
 ARTICLE_HEADING = re.compile(r"(?m)^\s*Pasal\s+([0-9]+[A-Za-z]?|[IVXLC]+)\s*$")
 # A standalone "LAMPIRAN" line after the last article starts the attachments (forms, tables).
 ATTACHMENT_HEADING = re.compile(r"(?m)^\s*LAMPIRAN\s*$")
+# Chapter / part / paragraph headings that open the next group of articles. They are printed just before
+# the next "Pasal", so without this they end up at the tail of the previous article.
+STRUCTURE_HEADING = re.compile(r"(?m)^[ \t]*(?:BAB[ \t]+[IVXLC]+|Bagian[ \t]+Ke[a-z]+|Paragraf[ \t]+\d+)[ \t]*$")
 # Page numbers printed as "- 12 -" on their own line. Layout, not legal text.
 PAGE_NUMBER_LINE = re.compile(r"(?m)^[ \t]*-[ \t]*\d{1,4}[ \t]*-[ \t]*\n?")
 MAX_CHUNK_CHARS = 4500
@@ -50,15 +53,22 @@ def structural_sections(text: str) -> list[Section]:
     attachment = ATTACHMENT_HEADING.search(text, articles[-1].end())
     body_end = attachment.start() if attachment else len(text)
     sections = []
-    if preamble := text[: articles[0].start()].strip():
+    if preamble := _without_heading(text[: articles[0].start()]):
         sections.append(Section("preamble", None, preamble))
     for index, match in enumerate(articles):
         end = articles[index + 1].start() if index + 1 < len(articles) else body_end
-        if body := text[match.end():end].strip():
+        if body := _without_heading(text[match.end():end]):
             sections.append(Section("article", match.group(1), body))
     if attachment and (appendix := text[attachment.start():].strip()):
         sections.append(Section("attachment", None, appendix))
     return sections
+
+
+def _without_heading(block: str) -> str:
+    """Drop a trailing chapter/part heading, which belongs to the articles that follow. (Adding the chapter
+    title to the embedding was measured on PMK 28/2026 and did not improve retrieval, so it is not kept.)"""
+    found = STRUCTURE_HEADING.search(block)
+    return (block[: found.start()] if found else block).strip()
 
 
 def chunks(section: str) -> list[str]:

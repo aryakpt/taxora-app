@@ -121,6 +121,26 @@ def test_attachments_are_separated_from_the_last_article_and_page_numbers_remove
     assert sections[2].text.startswith("LAMPIRAN")
 
 
+def test_chapter_headings_are_not_part_of_the_article_before_them():
+    text = "\n".join([
+        "Menimbang: contoh.", "BAB I", "KETENTUAN UMUM", "Pasal 1", "Definisi.",
+        "Pasal 2", "Pihak yang berhak:", "a. satu; atau", "b. dua.",
+        "BAB III", "PENGEMBALIAN BAGI WAJIB PAJAK", "DENGAN KRITERIA TERTENTU", "Bagian Kesatu", "Umum",
+        "Pasal 3", "Isi pasal tiga.", "Pasal 4", "Isi pasal empat.",
+    ])
+    sections = structural_sections(text)
+
+    assert [(s.number, s.text) for s in sections] == [
+        (None, "Menimbang: contoh."), ("1", "Definisi."), ("2", "Pihak yang berhak:\na. satu; atau\nb. dua."),
+        ("3", "Isi pasal tiga."), ("4", "Isi pasal empat.")]
+
+
+def test_the_word_bab_inside_a_sentence_is_not_a_heading():
+    sections = structural_sections("Pasal 1\nSebagaimana diatur dalam BAB II dan\nBagian Kedua peraturan ini.\nPasal 2\nIsi.")
+
+    assert "BAB II" in sections[0].text and "Bagian Kedua" in sections[0].text
+
+
 @pytest.mark.parametrize("content", [make_pdf([]), b"%PDF-1.4 broken", b"not a pdf"])
 def test_unreadable_or_textless_pdfs_are_reported(content):
     with pytest.raises(ExtractionError):
