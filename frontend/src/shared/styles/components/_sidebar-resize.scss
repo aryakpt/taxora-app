@@ -1,0 +1,50 @@
+// Desktop sidebar width, set by dragging its right edge (SidebarResizer, useSidebarWidth).
+@use '../abstracts/tokens' as *;
+
+@media (min-width: 801px) {
+  .sidebar { width: var(--sidebar-width, 258px); }
+  .main-area { margin-left: var(--sidebar-width, 258px); }
+  .sidebar-collapsed .main-area { margin-left: 0; }
+}
+
+.sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: -4px;
+  bottom: 0;
+  z-index: 5;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+
+  // A thin line that appears on hover, focus, and while dragging.
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 2px;
+    background: transparent;
+    transition: background $motion-fast;
+  }
+
+  &:hover::after, &:focus-visible::after { background: $color-focus; }
+  &:focus-visible { outline: none; }
+}
+
+// While dragging: follow the pointer without the open/close animation, and do not select text.
+.sidebar-resizing {
+  cursor: col-resize;
+  user-select: none;
+
+  .sidebar, .main-area { transition: none; }
+  .sidebar-resizer::after { background: $color-focus; }
+}
+
+// On phones the sidebar is a slide-in drawer with a fixed width; the collapsed sidebar has no edge to drag.
+@media (max-width: 800px) {
+  .sidebar-resizer { display: none; }
+}
+
+.sidebar-collapsed .sidebar-resizer { display: none; }
