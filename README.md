@@ -61,6 +61,16 @@ Open the Vite URL, then register an account or sign in. Sessions use an HTTP-onl
 
 The API and frontend run natively for fast reloads and debugging; Docker is only used for the database. A production API image is not defined yet.
 
+## Sign in with Google
+
+Optional. Without `GOOGLE_CLIENT_ID` the login page shows only email and password.
+
+1. Google Cloud Console → APIs & Services → **OAuth consent screen**: set it up (External, app name, support email).
+2. **Credentials → Create credentials → OAuth client ID**, type **Web application**. Under *Authorized JavaScript origins* add `http://localhost:5173` (and the production URL later). No redirect URI is needed.
+3. Put the client ID in `backend/.env` as `GOOGLE_CLIENT_ID=...apps.googleusercontent.com` and restart the API. No client secret is used; the frontend reads the ID from `GET /api/v1/auth/providers`.
+
+The backend verifies Google's signature, the audience (this client ID), the issuer, the expiry, and that Google has verified the email. The first sign-in creates an account with role `user`, or links an existing account with the same email. Google-only accounts have no password.
+
 ## Knowledge base ingestion
 
 ```text

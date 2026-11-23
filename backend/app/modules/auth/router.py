@@ -5,9 +5,11 @@ from app.core.config import settings
 from app.core.database import SessionDep
 from app.core.rate_limit import rate_limit
 from app.core.security import create_access_token, hash_password, verify_password
+from app.modules.audit.models import AuditLog
+from app.modules.auth import google
 from app.modules.auth.dependencies import CurrentUser
 from app.modules.auth.models import User, UserRole
-from app.modules.auth.schemas import LoginRequest, RegisterRequest, UserResponse
+from app.modules.auth.schemas import GoogleLoginRequest, LoginRequest, RegisterRequest, UserResponse
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -20,7 +22,8 @@ register_limit = rate_limit("auth.register", lambda: settings.auth_registrations
 
 
 def serialize_user(user: User) -> UserResponse:
-    return UserResponse(id=str(user.id), email=user.email, full_name=user.full_name, role=user.role)
+    return UserResponse(id=str(user.id), email=user.email, full_name=user.full_name, role=user.role,
+                        avatar_url=user.avatar_url)
 
 
 def set_session_cookie(response: Response, user: User) -> None:
@@ -68,6 +71,42 @@ async def login(body: LoginRequest, response: Response, session: SessionDep):
     if user is None or not user.password_hash or not password_ok:
         raise HTTPException(status_code=401, detail="Email or password is incorrect")
 
+    set_session_cookie(response, user)
+    return serialize_user(user)
+
+
+@router.get("/providers")
+async def providers():
+    """Sign-in options the login page should offer. The Google client ID is public by design."""
+    return {"google_client_id": settings.google_client_id or None}
+
+
+@router.post("/google", response_model=UserResponse, dependencies=[Depends(login_limit)])
+async def google_login(body: GoogleLoginRequest, response: Response, session: SessionDep):
+    """Sign in with a Google ID token. The first sign-in creates an account (role user), or links an
+    existing account with the same email, which Google has verified."""
+    try:
+        identity = await google.verify_credential(body.credential)
+    except google.InvalidGoogleCredential as exc:
+        raise HTTPException(status_code=401, detail="Google sign-in failed") from exc
+
+    user = await session.scalar(select(User).where(User.google_sub == identity.subject))
+    action = "auth.google.signed_in"
+    if user is None:
+        user = await session.scalar(select(User).where(func.lower(User.email) == identity.email))
+        if user is not None and user.google_sub:
+            # The email belongs to an account already linked to a different Google account.
+            raise HTTPException(status_code=409, detail="This email is linked to another Google account")
+        action = "auth.google.linked" if user else "auth.google.created"
+        if user is None:
+            user = User(email=identity.email, full_name=identity.name, role=UserRole.user.value)
+            session.add(user)
+        user.google_sub = identity.subject
+    user.full_name = user.full_name or identity.name
+    user.avatar_url = identity.picture or user.avatar_url
+    await session.flush()
+    if action != "auth.google.signed_in":
+        session.add(AuditLog(actor_id=user.id, action=action, resource_id=str(user.id)))
     set_session_cookie(response, user)
     return serialize_user(user)
 

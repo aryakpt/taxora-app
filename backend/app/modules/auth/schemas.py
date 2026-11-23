@@ -14,8 +14,13 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=20, max_length=4096, description="ID token from Google Identity Services")
+
+
 class UserResponse(BaseModel):
     id: str
     email: str | None
     full_name: str | None
     role: str
+    avatar_url: str | None = None
