@@ -84,3 +84,30 @@
   th, td { padding: 7px 10px; border: 1px solid $color-border; text-align: left; vertical-align: top; }
   th { background: $color-canvas; font-weight: 600; color: #2f3d47; }
 }
+
+// Chat page: the main area is exactly one screen tall, so the message list (.chat-scroller) scrolls on its
+// own and the top bar and the composer stay in place. Other pages keep normal page scrolling.
+.main-area.chat-layout {
+  height: 100vh;
+  height: 100dvh; // phones: the visible height, without the browser's address bar
+  min-height: 0;
+  overflow: hidden;
+
+  .chat-scroller { overscroll-behavior: contain; }
+
+  .composer-wrap {
+    position: relative;
+
+    // Fade the last lines of the conversation into the composer instead of cutting them off.
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 100%;
+      height: 18px;
+      background: linear-gradient(to bottom, transparent, $color-canvas);
+      pointer-events: none;
+    }
+  }
+}

@@ -1,6 +1,6 @@
 import {useMemo, useState, type CSSProperties} from 'react';
 import {useTranslation} from 'react-i18next';
-import {useNavigate} from 'react-router-dom';
+import {useLocation, useNavigate} from 'react-router-dom';
 import {AppHeader} from './shared/components/AppHeader';
 import {AppSidebar} from './shared/components/AppSidebar';
 import {AppRouter} from './router/AppRouter';
@@ -16,6 +16,7 @@ export default function App() {
   const auth = useAuth();
   const request = useMemo(() => createApiClient(), []);
   const navigate = useNavigate();
+  const {pathname} = useLocation();
   const history = useConversations(request, auth.user?.id || '');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const sidebar = useSidebarWidth();
@@ -104,7 +105,8 @@ export default function App() {
         onResizeEnd={sidebar.save}
         onCloseMobile={() => setMobileNavOpen(false)}
       />
-      <main id="main-content" className="main-area">
+      {/* The chat fills the screen: only the messages scroll, the composer stays at the bottom. */}
+      <main id="main-content" className={`main-area ${pathname === '/' ? 'chat-layout' : ''}`}>
         <AppHeader
           onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
           onOpenMobile={() => setMobileNavOpen(true)}
