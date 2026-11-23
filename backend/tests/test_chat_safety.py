@@ -320,3 +320,9 @@ async def test_a_briefly_rate_limited_model_is_an_ordinary_retryable_error():
     with pytest.raises(LLMError) as raised:
         await llm.complete_json("s", "u")
     assert not isinstance(raised.value, QuotaExhausted) and "429" in str(raised.value)
+
+
+def test_answers_are_asked_for_in_markdown_without_links_or_html():
+    for allow_general in (False, True):
+        prompt = system_prompt("id", allow_general)
+        assert "Markdown" in prompt and "No links, images, or HTML" in prompt

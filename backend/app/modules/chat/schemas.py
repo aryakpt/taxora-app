@@ -19,6 +19,8 @@ class ChatRequest(BaseModel):
     conversation_id: UUID | None = None
     # Everything about the case (tax year, taxpayer, transaction) comes from the question itself.
     question: str = Field(min_length=3, max_length=4000)
+    # The interface language. Answers follow the question's own language; this only decides when the
+    # question gives no clear signal (see query_understanding/language.py).
     response_language: Literal["en", "id"] = "id"
 
 
