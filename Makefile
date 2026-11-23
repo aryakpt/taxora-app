@@ -1,7 +1,7 @@
 BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 
-.PHONY: help db-up db-down db-reset install migrate api web test lint check set-role seed ask-raw eval eval-draft reprocess
+.PHONY: help db-up db-down db-reset install migrate api web test lint check set-role seed ask-raw eval eval-draft reprocess reindex
 
 help:  ## List available commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-11s %s\n", $$1, $$2}'
@@ -48,6 +48,9 @@ eval:  ## Score scope guard + retrieval on the evaluation dataset (published doc
 
 eval-draft:  ## Same, also searching documents still under review
 	cd $(BACKEND) && .venv/bin/python -m app.cli eval-retrieval --include-unreviewed
+
+reindex:  ## Embed chunks that have no vector (after an embedding model change); safe to rerun, it continues
+	cd $(BACKEND) && .venv/bin/python -m app.cli reindex
 
 reprocess:  ## Re-extract a document still under review with the current extractor: make reprocess JOB=<id>
 	@test -n "$(JOB)" || (echo 'usage: make reprocess JOB=<job id>' && exit 1)

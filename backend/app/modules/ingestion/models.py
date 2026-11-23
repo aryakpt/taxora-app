@@ -18,6 +18,7 @@ class JobStatus(str, Enum):
     approved = "approved"
     published = "published"
     failed = "failed"
+    rejected = "rejected"  # a reviewer found the extraction or metadata wrong; delete and re-submit
 
 
 class IngestionJob(Base):
@@ -26,7 +27,7 @@ class IngestionJob(Base):
     # attribute later would need lazy IO, which async sessions do not allow.
     __mapper_args__ = {"eager_defaults": True}
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    source_url: Mapped[str] = mapped_column(Text)
+    source_url: Mapped[str | None] = mapped_column(Text)  # optional for uploads
     filename: Mapped[str | None] = mapped_column(String(300))
     status: Mapped[str] = mapped_column(String(30), default=JobStatus.queued.value)
     error: Mapped[str | None] = mapped_column(Text)

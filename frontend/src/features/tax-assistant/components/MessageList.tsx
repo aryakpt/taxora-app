@@ -41,10 +41,12 @@ export function MessageList({ messages, busy, feedback, onFeedback }: Props) {
           {!!message.sources?.length && <div className="sources-block"><div className="sources-title"><span><BookOpen size={15} /> {t('messages.legalBasis')}</span><span className="source-count">{message.sources.length} {t(message.sources.length === 1 ? 'messages.source' : 'messages.sources')}</span></div>
             {message.sources.map(source => <div className="source-card" key={source.evidence_id}>
               <div className="source-top"><span className="source-type">{t('messages.regulation')}</span><span className={`verification ${source.verification_status === 'published' ? 'verified' : ''}`}><ShieldCheck size={12} />{source.verification_status === 'published' ? t('common.published') : source.verification_status}</span></div>
-              <a className="source-name" href={source.source_url} target="_blank" rel="noreferrer">{source.regulation_number} · {source.title}<ArrowUpRight size={14} /></a>
+              {source.source_url
+                ? <a className="source-name" href={source.source_url} target="_blank" rel="noreferrer">{source.regulation_number} · {source.title}<ArrowUpRight size={14} /></a>
+                : <span className="source-name">{source.regulation_number} · {source.title}</span>}
               {source.article && <span className="source-article">{source.article}</span>}
               <blockquote>“{source.quote}”</blockquote>
-              <div className="source-bottom"><span>{source.effective_from ? t('messages.effective', { date: source.effective_from }) : t('messages.effectiveUnknown')}</span><a href={source.source_url} target="_blank" rel="noreferrer">{t('messages.viewOriginal')} <ArrowUpRight size={12} /></a></div>
+              <div className="source-bottom"><span>{source.effective_from ? t('messages.effective', { date: source.effective_from }) : t('messages.effectiveUnknown')}</span>{source.source_url && <a href={source.source_url} target="_blank" rel="noreferrer">{t('messages.viewOriginal')} <ArrowUpRight size={12} /></a>}</div>
             </div>)}
           </div>}
           <div className="message-actions"><button aria-label={t('messages.helpful')} title={t('messages.helpful')} className={feedback[message.id || ''] === 'positive' ? 'rated' : ''} onClick={() => onFeedback(message.id, 'positive')}><ThumbsUp size={14} /></button><button aria-label={t('messages.unhelpful')} title={t('messages.unhelpful')} className={feedback[message.id || ''] === 'negative' ? 'rated' : ''} onClick={() => onFeedback(message.id, 'negative')}><ThumbsDown size={14} /></button><span>{message.latency ? `${(message.latency / 1000).toFixed(1)}s` : ''}</span></div>

@@ -50,7 +50,7 @@ async def hybrid_search(
     query: str,
     user_id: uuid.UUID,
     reference_date: date,
-    embedder: Embedder,
+    embedder: Embedder | None,
     statuses: tuple[str, ...] = ("published",),
 ) -> list[dict]:
     """Keyword + vector search over published chunks in force on `reference_date` that the user may see, fused with Reciprocal
@@ -96,13 +96,15 @@ async def hybrid_search(
             .limit(candidate_limit)
         )).all()
 
-    vector = await embedder.embed(query)
-    distance = DocumentChunk.embedding.cosine_distance(vector)
-    vector_rows = (await session.execute(
-        base.where(DocumentChunk.embedding.is_not(None), distance <= settings.retrieval_max_cosine_distance)
-        .order_by(distance)
-        .limit(candidate_limit)
-    )).all()
+    vector_rows = []
+    if embedder is not None:  # without an embedding service, search by keywords only
+        vector = await embedder.embed(query)
+        distance = DocumentChunk.embedding.cosine_distance(vector)
+        vector_rows = (await session.execute(
+            base.where(DocumentChunk.embedding.is_not(None), distance <= settings.retrieval_max_cosine_distance)
+            .order_by(distance)
+            .limit(candidate_limit)
+        )).all()
 
     scores: dict[uuid.UUID, tuple[object, float]] = {}
     for rows, weight in ((keyword_rows, settings.retrieval_keyword_weight), (vector_rows, 1.0)):

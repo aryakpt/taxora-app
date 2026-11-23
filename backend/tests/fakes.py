@@ -7,7 +7,9 @@ TAX_WORDS = ("pajak", "tax", "pph", "ppn", "gaji", "potong", "faktur", "tarif", 
 
 def fake_vector(text_value: str) -> list[float]:
     """Deterministic stand-in for real embeddings: tax-related text points one way, the rest another."""
-    vector = [0.0] * 384
+    from app.core.config import settings
+
+    vector = [0.0] * settings.embedding_dimensions
     vector[0 if any(word in text_value.lower() for word in TAX_WORDS) else 1] = 1.0
     return vector
 

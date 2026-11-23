@@ -6,7 +6,7 @@ const UPLOAD_TIMEOUT_MS = 120_000
 
 /** Metadata the admin supplies for a document. Dates are ISO strings (yyyy-mm-dd) or null. */
 export interface RegulationMetadata {
-  source_url: string
+  source_url: string  // required for a link submission; may be empty for an upload
   regulation_number: string
   regulation_type: string
   title: string
@@ -39,7 +39,7 @@ export function createIngestionApi(request: ApiRequest) {
     submitUrl: (metadata: RegulationMetadata) => request<IngestionJob>(BASE, { method: 'POST', data: metadata }),
     upload: (metadata: RegulationMetadata, file: File) => {
       const form = new FormData()
-      for (const [key, value] of Object.entries(metadata)) if (value !== null) form.append(key, value)
+      for (const [key, value] of Object.entries(metadata)) if (value !== null && value !== '') form.append(key, value)
       form.append('file', file)
       return request<IngestionJob>(`${BASE}/upload`, { method: 'POST', data: form, timeout: UPLOAD_TIMEOUT_MS })
     },
@@ -50,6 +50,8 @@ export function createIngestionApi(request: ApiRequest) {
     approve: (id: string) => action(id, 'approve'),
     publish: (id: string) => action(id, 'publish'),
     retry: (id: string) => action(id, 'retry'),
+    reject: (id: string, reason: string) => request<IngestionJob>(`${BASE}/${id}/reject`, { method: 'POST', data: { reason } }),
+    remove: (id: string) => request<{ deleted: boolean }>(`${BASE}/${id}`, { method: 'DELETE' }),
     /** Fetches the stored PDF with the session cookie and hands it to the browser as a download. */
     downloadOriginal: async (job: IngestionJob) => {
       const blob = await request<Blob>(`${BASE}/${job.id}/document`, { responseType: 'blob', timeout: UPLOAD_TIMEOUT_MS })

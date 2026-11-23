@@ -24,6 +24,24 @@
   p { margin: 0; font-size: 13px; line-height: 1.6; color: #5b6670; overflow-wrap: anywhere; }
 }
 
+.dialog-field {
+  margin-top: 14px;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #46525c;
+
+  textarea {
+    padding: 8px 10px;
+    border: 1px solid $color-border;
+    border-radius: $radius-control;
+    font: inherit;
+    font-weight: 400;
+    resize: vertical;
+  }
+}
+
 .confirm-dialog-icon {
   width: 40px;
   height: 40px;

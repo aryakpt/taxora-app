@@ -207,6 +207,99 @@ async def test_documents_under_review_can_be_reprocessed_but_approved_ones_canno
         await service.reprocess(job["id"])
 
 
+async def test_an_upload_does_not_need_an_official_link_but_a_link_submission_does(client, source, document_storage):
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    form = {key: value for key, value in METADATA.items() if key != "source_url"} | {"source_url": ""}
+
+    uploaded = await client.post("/api/v1/admin/ingestion/upload", data=form,
+                                 files={"file": ("fixture.pdf", PDF, "application/pdf")})
+    without_link = await client.post("/api/v1/admin/ingestion", json={k: v for k, v in METADATA.items()
+                                                                      if k != "source_url"})
+
+    assert uploaded.status_code == 202, uploaded.text
+    job = (await client.get(f"/api/v1/admin/ingestion/{uploaded.json()['id']}")).json()
+    assert job["status"] == "review_required" and job["source_url"] is None
+    assert without_link.status_code == 422
+
+
+async def test_a_reviewer_rejects_with_a_reason_and_the_document_is_never_searched(client, source):
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client)
+    base = f"/api/v1/admin/ingestion/{job['id']}"
+
+    await sign_in_as(client, "user@example.com", UserRole.user)
+    assert (await client.post(f"{base}/reject", json={"reason": "Pasal 2 terpotong"})).status_code == 403
+
+    await sign_in_as(client, "reviewer@example.com", UserRole.reviewer)
+    assert (await client.post(f"{base}/reject", json={"reason": "x"})).status_code == 422
+    rejected = await client.post(f"{base}/reject", json={"reason": "Pasal 2 terpotong di halaman 3"})
+
+    assert rejected.status_code == 200, rejected.text
+    body = rejected.json()
+    assert body["status"] == "rejected" and body["version"]["status"] == "rejected"
+    assert body["rejection"]["reason"] == "Pasal 2 terpotong di halaman 3"
+    assert body["rejection"]["by"] == "reviewer@example.com"
+    assert (await client.post(f"{base}/approve")).status_code == 409
+    assert (await client.post(f"{base}/reject", json={"reason": "lagi lagi"})).status_code == 409
+
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    again = await submit(client)  # the same file again: extracted afresh and back under review
+    assert again["status"] == "review_required" and again["version"]["status"] == "review_required"
+    assert again["rejection"] is None and await count(LegalProvision) == 3
+
+
+async def test_an_admin_deletes_a_published_document_and_everything_that_belongs_to_it(client, source,
+                                                                                   document_storage):
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client)
+    duplicate = await submit(client)  # same file: shares the version
+    base = f"/api/v1/admin/ingestion/{job['id']}"
+    await client.post(f"{base}/approve")
+    await client.post(f"{base}/publish")
+    stored_files = list(document_storage.rglob("*.pdf"))
+    assert len(stored_files) == 1 and len((await client.get("/api/v1/regulations")).json()) == 1
+
+    await sign_in_as(client, "reviewer@example.com", UserRole.reviewer)
+    assert (await client.delete(base)).status_code == 403
+
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    deleted = await client.delete(base)
+
+    assert deleted.status_code == 200, deleted.text
+    assert deleted.json()["status"] == "published" and deleted.json()["jobs"] == 2
+    assert (await client.get("/api/v1/regulations")).json() == []
+    assert (await client.get(f"/api/v1/admin/ingestion/{duplicate['id']}")).status_code == 404
+    for model in (DocumentChunk, LegalProvision, RegulationVersion, Regulation, IngestionJob):
+        assert await count(model) == 0
+    assert not stored_files[0].exists()
+    async with SessionLocal() as session:
+        actions = (await session.scalars(select(AuditLog.action))).all()
+    assert "ingestion.deleted" in actions
+
+
+async def test_a_document_still_being_processed_cannot_be_deleted(client, source):
+    from sqlalchemy import update
+
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client)
+    async with SessionLocal() as session, session.begin():
+        await session.execute(update(IngestionJob).values(status="processing"))
+
+    assert (await client.delete(f"/api/v1/admin/ingestion/{job['id']}")).status_code == 409
+    assert (await client.delete("/api/v1/admin/ingestion/00000000-0000-0000-0000-000000000000")).status_code == 404
+
+
+async def test_a_stored_file_used_by_another_document_is_kept(client, source, document_storage):
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    first = await submit(client)
+    second = await submit(client, regulation_number="2 TAHUN 2026")  # same PDF, another regulation
+
+    await client.delete(f"/api/v1/admin/ingestion/{first['id']}")
+
+    assert len(list(document_storage.rglob("*.pdf"))) == 1
+    assert (await client.get(f"/api/v1/admin/ingestion/{second['id']}/document")).status_code == 200
+
+
 async def test_only_admins_submit_and_regular_users_see_nothing(client, source):
     await sign_in_as(client, "user@example.com", UserRole.user)
     assert (await client.post("/api/v1/admin/ingestion", json=METADATA)).status_code == 403
@@ -259,6 +352,40 @@ async def test_failures_are_recorded_and_retry_does_not_refetch_stored_files(cli
 
     await client.post(f"/api/v1/admin/ingestion/{failed['id']}/retry")
     assert len(fetched) == 2  # the stored scan is reused, not downloaded again
+
+
+async def test_an_embedding_outage_fails_the_job_with_a_retryable_message(client, source, fake_ai, monkeypatch):
+    from app.modules.generation.embeddings import EmbeddingError
+
+    async def broken(texts):
+        raise EmbeddingError("Batas pemakaian layanan embedding tercapai; coba lagi nanti.")
+
+    monkeypatch.setattr(fake_ai.embedder, "embed_many", broken)
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+
+    job = await submit(client)
+
+    assert job["status"] == "failed" and "Gunakan retry" in job["error"]
+    assert await count(DocumentChunk) == 0  # nothing half-indexed
+
+
+async def test_reindex_embeds_only_the_chunks_without_a_vector_and_can_resume(client, source):
+    from sqlalchemy import update
+
+    from app.modules.ingestion import service
+
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    await submit(client)
+    async with SessionLocal() as session, session.begin():
+        await session.execute(update(DocumentChunk).values(embedding=None))
+    progress = []
+
+    done = await service.reindex(batch=2, progress=lambda d, t: progress.append((d, t)))
+
+    assert done == 3 and progress == [(2, 3), (3, 3)]
+    async with SessionLocal() as session:
+        assert await session.scalar(select(func.count()).where(DocumentChunk.embedding.is_(None))) == 0
+    assert await service.reindex() == 0  # nothing left
 
 
 async def test_unexpected_errors_are_not_leaked_to_admins(client, source):

@@ -54,22 +54,31 @@ class Settings(BaseSettings):
     #   any:            no restriction (throwaway testing only)
     llm_data_policy: Literal["zero_retention", "no_training", "any"] = "no_training"
 
-    # Embeddings run locally (fastembed); changing the model requires re-indexing all chunks.
-    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-    embedding_dimensions: int = 384
+    # Embeddings through an OpenAI-compatible API (Gemini by default). Changing the model or the dimensions
+    # requires `make reindex` (and a migration if the dimensions change: the column is vector(N)).
+    # The key defaults to LLM_API_KEY; set EMBEDDING_API_KEY when the LLM comes from another provider.
+    embedding_api_key: str = ""
+    embedding_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    embedding_model: str = "gemini-embedding-001"
+    embedding_dimensions: int = 768
+    # Gemini free tier: 30,000 embedding tokens per minute per model. Requests are paced under this budget
+    # (estimated tokens); 0 disables pacing (paid tiers).
+    embedding_tokens_per_minute: int = 26000
 
     # Retrieval and chat safety. Thresholds are initial values and must be re-tuned on the
     # evaluation dataset (PRD §11) whenever the embedding model or knowledge base changes.
     retrieval_top_k: int = 5
-    # Calibrated on 6 questions against PMK 28/2026 only (relevant 0.18-0.45, off-topic 0.88+).
-    retrieval_max_cosine_distance: float = 0.7
+    # gemini-embedding-001 on 28 evaluation questions: closest relevant chunk 0.14-0.28, questions the knowledge
+    # base cannot answer 0.31-0.35. Set a little above so relevant chunks ranked 2-5 are kept.
+    retrieval_max_cosine_distance: float = 0.35
     # Weight of the keyword channel in rank fusion (vector = 1.0). Higher values let long chunks that
     # merely share common words ("pajak", "pengembalian") push out the best semantic match.
     retrieval_keyword_weight: float = 0.1
-    # Calibrated on 10 tax questions without tax terms (lowest 0.368) and 15 off-topic ones (highest 0.422,
-    # "Berapa gaji UMR Jakarta?"). Set low on purpose: refusing a real tax question is worse than letting an
-    # off-topic one reach retrieval and the LLM's own scope rule.
-    scope_min_similarity: float = 0.33
+    # Scope guard margin (tax-anchor similarity minus non-tax-anchor similarity, gemini-embedding-001).
+    # Calibrated on 10 tax questions without tax terms (lowest +0.045) and 15 off-topic ones (highest +0.025,
+    # "Siapa menteri keuangan Indonesia?"). Low on purpose: refusing a real tax question is worse than letting
+    # an off-topic one reach retrieval and the LLM's own scope rule. Re-calibrate when the model changes.
+    scope_min_margin: float = 0.03
     chat_requests_per_hour: int = 20
     # True: tax questions the knowledge base cannot answer get a general-knowledge answer, labelled as not
     # verified against regulations (status general_answer). False: such questions get insufficient_evidence.

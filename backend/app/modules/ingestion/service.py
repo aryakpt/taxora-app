@@ -19,10 +19,11 @@ from app.core.database import SessionLocal
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import User
 from app.modules.generation import providers
+from app.modules.generation.embeddings import EmbeddingError
 from app.modules.ingestion import sources, storage
 from app.modules.ingestion.extraction import ExtractionError, chunks, extract_text, structural_sections
 from app.modules.ingestion.models import IngestionJob, JobStatus
-from app.modules.ingestion.schemas import MetadataCorrection, RegulationMetadata, VersionDates
+from app.modules.ingestion.schemas import MetadataCorrection, RegulationMetadata, Rejection, VersionDates
 from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
 logger = logging.getLogger("taxora.ingestion")
@@ -68,7 +69,7 @@ async def create_job(
 ) -> IngestionJob:
     regulation = await regulation_for(session, metadata)
     job = IngestionJob(
-        source_url=str(metadata.source_url),
+        source_url=str(metadata.source_url) if metadata.source_url else None,
         filename=filename,
         status=JobStatus.queued.value,
         regulation_id=regulation.id,
@@ -98,6 +99,8 @@ async def run_job(job_id: uuid.UUID) -> None:
                 await _index(session, await session.get(IngestionJob, job_id))
         except (sources.SourceRejected, ExtractionError) as exc:
             await _fail(session, job_id, str(exc))
+        except EmbeddingError as exc:  # quota or outage: nothing is stored, retry indexes the document again
+            await _fail(session, job_id, f"{exc} Gunakan retry untuk memproses ulang.")
         except Exception:
             logger.exception("ingestion failed job_id=%s", job_id)
             await _fail(session, job_id, "Kesalahan internal saat memproses dokumen. Lihat log server.")
@@ -121,6 +124,17 @@ async def _index(session: AsyncSession, job: IngestionJob) -> None:
     existing = await session.scalar(select(RegulationVersion).where(
         RegulationVersion.regulation_id == job.regulation_id, RegulationVersion.document_hash == job.storage_key
     ))
+    if existing and existing.status == JobStatus.rejected.value:
+        # The same file again after a rejection (one version per file): extract it afresh and review it again.
+        await session.execute(delete(LegalProvision).where(LegalProvision.version_id == existing.id))
+        sections = structural_sections(extract_text(storage.load(job.storage_key)))
+        detail = _summary(len(sections), await _build_provisions(session, existing, sections))
+        existing.status, existing.verified_at = JobStatus.review_required.value, None
+        await session.execute(update(IngestionJob).where(IngestionJob.version_id == existing.id)
+                              .values(status=JobStatus.review_required.value))
+        job.version_id, job.status, job.detail = existing.id, JobStatus.review_required.value, detail
+        session.add(AuditLog(actor_id=job.requested_by, action="ingestion.resubmitted", resource_id=str(job.id)))
+        return
     if existing:
         job.version_id, job.status = existing.id, existing.status
         job.detail = "Dokumen identik sudah pernah diproses; job ini memakai versi yang sudah ada."
@@ -155,12 +169,39 @@ async def _build_provisions(session: AsyncSession, version: RegulationVersion, s
         session.add(provision)
         pieces.extend((provision, piece) for piece in chunks(section.text))
     await session.flush()
-    vectors = await providers.get_embedder().embed_many([piece for _, piece in pieces])
+    embedder = providers.get_embedder()
+    if embedder is None:
+        raise EmbeddingError("Layanan embedding belum dikonfigurasi (EMBEDDING_API_KEY atau LLM_API_KEY).")
+    vectors = await embedder.embed_many([piece for _, piece in pieces])
     session.add_all(
         DocumentChunk(provision_id=provision.id, chunk_text=piece, token_count=len(piece.split()), embedding=vector)
         for (provision, piece), vector in zip(pieces, vectors, strict=True)
     )
     return len(pieces)
+
+
+async def reindex(batch: int = 40, progress=None) -> int:
+    """Embed every chunk that has no vector yet (after a model change, or a run stopped by a quota limit).
+    Each batch is committed, so running it again continues where it stopped. Returns how many were embedded."""
+    embedder = providers.get_embedder()
+    if embedder is None:
+        raise EmbeddingError("Layanan embedding belum dikonfigurasi (EMBEDDING_API_KEY atau LLM_API_KEY).")
+    async with SessionLocal() as session:
+        remaining = await session.scalar(select(func.count()).where(DocumentChunk.embedding.is_(None)))
+    done = 0
+    while True:
+        async with SessionLocal() as session, session.begin():
+            pending = (await session.scalars(
+                select(DocumentChunk).where(DocumentChunk.embedding.is_(None)).order_by(DocumentChunk.id).limit(batch)
+            )).all()
+            if not pending:
+                return done
+            vectors = await embedder.embed_many([chunk.chunk_text for chunk in pending])
+            for chunk, vector in zip(pending, vectors, strict=True):
+                chunk.embedding = vector
+        done += len(pending)
+        if progress:
+            progress(done, remaining)
 
 
 def _summary(sections: int, pieces: int) -> str:
@@ -249,6 +290,63 @@ async def publish(session: AsyncSession, job_id: uuid.UUID, user: User) -> Inges
     return await _move_version(session, job_id, user, JobStatus.approved, JobStatus.published)
 
 
+REJECT_ACTION = "ingestion.rejected"
+
+
+async def reject(session: AsyncSession, job_id: uuid.UUID, user: User, rejection: Rejection) -> IngestionJob:
+    """A reviewer turns down a document under review, with the reason. It is never searched; an admin can
+    delete it and submit a corrected one."""
+    job, version = await _job_and_version(session, job_id)
+    if version is None or version.status != JobStatus.review_required.value:
+        current = version.status if version else job.status
+        raise InvalidTransition(f"Hanya dokumen berstatus review_required yang bisa ditolak (status sekarang: {current}).")
+    version.status = JobStatus.rejected.value
+    await session.execute(update(IngestionJob).where(IngestionJob.version_id == version.id)
+                          .values(status=JobStatus.rejected.value))
+    session.add(AuditLog(actor_id=user.id, action=REJECT_ACTION, resource_id=str(job.id),
+                         details={"reason": rejection.reason.strip()}))
+    await session.flush()
+    await session.refresh(job)
+    return job
+
+
+async def delete_document(session: AsyncSession, job_id: uuid.UUID, user: User) -> dict:
+    """Delete a document: its version with provisions and chunks (database cascade), every job pointing to
+    that version, the regulation if it has no other version left, and the stored PDF if nothing else uses it.
+    Published documents can be deleted too: chat stops citing them at once. Jobs still being processed
+    cannot be deleted. Answers already given keep their stored sources."""
+    job, version = await _job_and_version(session, job_id)
+    if job.status in (JobStatus.queued.value, JobStatus.processing.value):
+        raise InvalidTransition("Dokumen yang masih diproses tidak bisa dihapus; tunggu sampai selesai.")
+    regulation = await session.get(Regulation, job.regulation_id) if job.regulation_id else None
+    jobs = (await session.scalars(select(IngestionJob).where(IngestionJob.version_id == version.id))).all() \
+        if version else [job]
+    keys = {key for key in [version.storage_key if version else None, *(j.storage_key for j in jobs)] if key}
+    summary = {"regulation": f"{regulation.regulation_type} {regulation.regulation_number}" if regulation else None,
+               "title": regulation.title if regulation else None, "status": version.status if version else job.status,
+               "jobs": len(jobs)}
+    for item in jobs:
+        await session.delete(item)
+    if version:
+        await session.delete(version)
+    await session.flush()
+    if regulation and not await session.scalar(
+            select(func.count()).select_from(RegulationVersion).where(RegulationVersion.regulation_id == regulation.id)):
+        if not await session.scalar(select(func.count()).select_from(IngestionJob)
+                                    .where(IngestionJob.regulation_id == regulation.id)):
+            await session.delete(regulation)
+    await session.flush()
+    for key in keys:  # keep files another job or version still uses
+        still_used = await session.scalar(select(func.count()).select_from(IngestionJob)
+                                          .where(IngestionJob.storage_key == key)) or \
+            await session.scalar(select(func.count()).select_from(RegulationVersion)
+                                 .where(RegulationVersion.storage_key == key))
+        if not still_used:
+            storage.delete(key)
+    session.add(AuditLog(actor_id=user.id, action="ingestion.deleted", resource_id=str(job.id), details=summary))
+    return summary
+
+
 async def retry(session: AsyncSession, job_id: uuid.UUID, user: User) -> IngestionJob:
     job, _ = await _job_and_version(session, job_id)
     if job.status != JobStatus.failed.value:
@@ -309,6 +407,15 @@ def _plain(value):
     return value.isoformat() if isinstance(value, date) else value
 
 
+async def rejection(session: AsyncSession, job_id: uuid.UUID) -> dict | None:
+    row = (await session.execute(
+        select(AuditLog, User.email).outerjoin(User, AuditLog.actor_id == User.id)
+        .where(AuditLog.resource_id == str(job_id), AuditLog.action == REJECT_ACTION)
+        .order_by(AuditLog.created_at.desc()).limit(1)
+    )).first()
+    return {"at": row[0].created_at, "by": row[1], "reason": (row[0].details or {}).get("reason")} if row else None
+
+
 async def corrections(session: AsyncSession, job_id: uuid.UUID) -> list[dict]:
     rows = (await session.execute(
         select(AuditLog, User.email).outerjoin(User, AuditLog.actor_id == User.id)
@@ -334,6 +441,7 @@ async def describe(session: AsyncSession, job: IngestionJob) -> dict:
         "updated_at": job.updated_at,
         "storage_available": bool(job.storage_key),
         "corrections": await corrections(session, job.id),
+        "rejection": await rejection(session, job.id),
         "regulation": {"id": regulation.id, "type": regulation.regulation_type,
                        "number": regulation.regulation_number, "title": regulation.title,
                        "issuer": regulation.issuer, "topic": regulation.topic} if regulation else None,

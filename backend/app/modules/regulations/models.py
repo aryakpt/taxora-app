@@ -28,7 +28,7 @@ class RegulationVersion(Base):
     __table_args__ = (UniqueConstraint("regulation_id", "document_hash"),)
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     regulation_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("regulations.id", ondelete="CASCADE"))
-    source_url: Mapped[str] = mapped_column(Text)
+    source_url: Mapped[str | None] = mapped_column(Text)  # official link; None for uploads without one
     document_hash: Mapped[str] = mapped_column(String(64))
     storage_key: Mapped[str | None] = mapped_column(String(64))  # original file, see ingestion/storage.py
     issued_at: Mapped[date | None] = mapped_column(Date)

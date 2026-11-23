@@ -11,6 +11,9 @@ os.environ["DATABASE_URL"] = os.environ.get(
 )
 os.environ.setdefault("AUTH_SECRET_KEY", "test-only-auth-secret-key-with-more-than-32-bytes")
 os.environ["LLM_API_KEY"] = ""  # tests never call a real provider; see the fake_ai fixture
+os.environ["EMBEDDING_API_KEY"] = ""
+# Must match the vector(N) column created by the migrations, whatever a developer's .env says.
+os.environ["EMBEDDING_DIMENSIONS"] = "768"
 
 import httpx  # noqa: E402
 from sqlalchemy import text  # noqa: E402
