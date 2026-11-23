@@ -49,25 +49,26 @@
 
 .sidebar-collapsed .sidebar-resizer { display: none; }
 
-// "New consultation": the sidebar's main action, one icon and a label.
+// "New consultation": the sidebar's main action. Same box as the navigation items below it
+// (height, padding, icon size, gap, type), only filled with the brand colour.
 .new-chat {
-  height: 40px;
+  height: auto;
+  min-height: 39px;
   justify-content: flex-start;
-  gap: 9px;
-  padding: 0 14px;
+  gap: 11px;
+  padding: 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #284b42;
   color: white;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  box-shadow: 0 1px 2px #182b3a1a, inset 0 1px 0 #ffffff14;
-  transition: background $motion-fast, transform $motion-fast;
+  box-shadow: none;
+  transition: background $motion-fast;
 
-  svg { flex-shrink: 0; opacity: .9; }
+  svg { flex-shrink: 0; }
   span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
   &:hover { background: #1f4038; border-color: transparent; }
-  &:active { transform: translateY(1px); }
   &:focus-visible { outline: 3px solid $color-focus; outline-offset: 2px; }
 }

@@ -1,6 +1,6 @@
 const en = {
   language: { select: 'Select language', english: 'English', indonesian: 'Bahasa Indonesia' },
-  common: { documentTitle: 'Taxora — Tax, made clearer', close: 'Close', workspace: 'Workspace', secureWorkspace: 'Secure workspace', help: 'Help', loading: 'Loading…', published: 'Published', originalSource: 'Original source', refresh: 'Refresh' },
+  common: { documentTitle: 'Taxora — Tax, made clearer', close: 'Close', workspace: 'Workspace', help: 'Help', loading: 'Loading…', published: 'Published', originalSource: 'Original source', refresh: 'Refresh' },
   navigation: {
     resizeSidebar: 'Resize sidebar', resizeSidebarHint: 'Drag to resize, double-click to reset', closeNavigation: 'Close navigation', openNavigation: 'Open navigation', toggleSidebar: 'Toggle sidebar', newConversation: 'New consultation', workspace: 'WORKSPACE', taxAssistant: 'Tax assistant', regulationLibrary: 'Regulation library', knowledgeAdmin: 'Knowledge admin', recent: 'RECENT', searchConversations: 'Search conversations', emptyHistory: 'Your consultations will appear here.', evidenceFirst: 'Evidence-first answers', sourcesToVerify: 'Sources you can verify.', signOut: 'Sign out', signedIn: 'Signed in',
   },
@@ -17,6 +17,22 @@ const en = {
   messages: {
     assistant: 'Taxora assistant', user: 'You', aiResponse: 'AI response', reviewingSources: 'Reviewing sources', loadingAnswer: 'Searching verified sources and preparing an answer. This can take up to a minute.',
     generalAnswer: 'General AI knowledge · not verified against regulations', insufficientEvidence: 'Insufficient verified evidence', clarificationNeeded: 'More information may help', outOfScope: 'Outside Taxora\'s scope', failed: 'The answer could not be completed', clarify: 'Information to clarify', limitations: 'Limitations', legalBasis: 'Legal basis', source: 'source', sources: 'sources', regulation: 'REGULATION', effective: 'Effective {{date}}', effectiveUnknown: 'Effective date not specified', viewOriginal: 'View original source', helpful: 'Helpful answer', unhelpful: 'Unhelpful answer',
+  },
+  help: {
+    title: 'How to use Taxora', askTitle: 'Asking a question',
+    ask1: 'Ask one question about Indonesian tax (PPh or PPN) in everyday words, in Indonesian or English. Taxora answers in the language you ask in.',
+    ask2: 'Mention what matters for the answer: the tax year, the kind of taxpayer (individual or company, PKP or not), and the transaction.',
+    ask3: 'Follow-up questions in the same conversation can be short: Taxora reads the last two exchanges.',
+    labelsTitle: 'What the answer labels mean',
+    answered: 'Legal basis', answeredText: 'The answer is backed by quoted articles from reviewed regulations. Open the source card to check the original.',
+    general: 'General AI knowledge', generalText: 'No matching regulation is in Taxora yet, so the answer comes from the AI\'s general knowledge. Check the current regulation, especially rates and deadlines.',
+    insufficient: 'Insufficient evidence', insufficientText: 'Taxora could not support an answer. Add details to your question or rephrase it.',
+    outOfScope: 'Outside scope', outOfScopeText: 'Taxora only answers questions about Indonesian tax.',
+    failed: 'Could not be completed', failedText: 'The AI service did not respond in time or its daily quota is used up. Try again later.',
+    limitsTitle: 'Keep in mind',
+    limit1: 'Taxora helps you understand the rules; it does not replace a tax consultant for decisions with consequences.',
+    limit2: 'Do not enter personal data such as NIK, NPWP, or full names.',
+    limit3: 'The knowledge base is still growing. The Regulation library lists the regulations Taxora can cite.',
   },
   history: { actions: 'Actions for {{title}}', rename: 'Rename', renameLabel: 'Conversation name', delete: 'Delete', cancel: 'Cancel', confirmTitle: 'Delete conversation?', confirmText: '“{{title}}” and all its messages will be deleted. This cannot be undone.' },
   account: { menu: 'Account', unnamed: 'Account', roles: { user: 'User', reviewer: 'Reviewer', admin: 'Admin' } },
@@ -56,7 +72,7 @@ type TranslationShape<T> = {
 
 const id: TranslationShape<typeof en> = {
   language: { select: 'Pilih bahasa', english: 'English', indonesian: 'Bahasa Indonesia' },
-  common: { documentTitle: 'Taxora — Pajak lebih mudah dipahami', close: 'Tutup', workspace: 'Ruang kerja', secureWorkspace: 'Ruang kerja aman', help: 'Bantuan', loading: 'Memuat…', published: 'Dipublikasikan', originalSource: 'Sumber asli', refresh: 'Muat ulang' },
+  common: { documentTitle: 'Taxora — Pajak lebih mudah dipahami', close: 'Tutup', workspace: 'Ruang kerja', help: 'Bantuan', loading: 'Memuat…', published: 'Dipublikasikan', originalSource: 'Sumber asli', refresh: 'Muat ulang' },
   navigation: {
     resizeSidebar: 'Ubah lebar sidebar', resizeSidebarHint: 'Tarik untuk mengubah lebar, klik dua kali untuk mengembalikan', closeNavigation: 'Tutup navigasi', openNavigation: 'Buka navigasi', toggleSidebar: 'Tampilkan/sembunyikan sidebar', newConversation: 'Konsultasi baru', workspace: 'RUANG KERJA', taxAssistant: 'Asisten pajak', regulationLibrary: 'Pustaka peraturan', knowledgeAdmin: 'Admin knowledge base', recent: 'TERBARU', searchConversations: 'Cari percakapan', emptyHistory: 'Percakapan Anda akan muncul di sini.', evidenceFirst: 'Jawaban berbasis bukti', sourcesToVerify: 'Sumber yang dapat diverifikasi.', signOut: 'Keluar', signedIn: 'Sudah masuk',
   },
@@ -73,6 +89,22 @@ const id: TranslationShape<typeof en> = {
   messages: {
     assistant: 'Asisten Taxora', user: 'Anda', aiResponse: 'Jawaban AI', reviewingSources: 'Meninjau sumber', loadingAnswer: 'Mencari sumber terverifikasi dan menyiapkan jawaban. Ini bisa memakan waktu hingga satu menit.',
     generalAnswer: 'Pengetahuan umum AI · belum diverifikasi dengan peraturan', insufficientEvidence: 'Bukti terverifikasi belum memadai', clarificationNeeded: 'Informasi tambahan dapat membantu', outOfScope: 'Di luar cakupan Taxora', failed: 'Jawaban tidak dapat diselesaikan', clarify: 'Informasi yang perlu diklarifikasi', limitations: 'Keterbatasan', legalBasis: 'Dasar hukum', source: 'sumber', sources: 'sumber', regulation: 'PERATURAN', effective: 'Berlaku {{date}}', effectiveUnknown: 'Tanggal berlaku tidak dicantumkan', viewOriginal: 'Lihat sumber asli', helpful: 'Jawaban membantu', unhelpful: 'Jawaban tidak membantu',
+  },
+  help: {
+    title: 'Cara memakai Taxora', askTitle: 'Cara bertanya',
+    ask1: 'Ajukan satu pertanyaan tentang pajak Indonesia (PPh atau PPN) dengan bahasa sehari-hari, dalam bahasa Indonesia atau Inggris. Taxora menjawab dalam bahasa yang Anda pakai.',
+    ask2: 'Sebutkan hal yang memengaruhi jawaban: tahun pajak, jenis wajib pajak (orang pribadi atau badan, PKP atau bukan), dan jenis transaksinya.',
+    ask3: 'Pertanyaan lanjutan dalam percakapan yang sama boleh singkat: Taxora membaca dua tanya-jawab terakhir.',
+    labelsTitle: 'Arti label jawaban',
+    answered: 'Dasar hukum', answeredText: 'Jawaban didukung kutipan pasal dari peraturan yang sudah ditinjau. Buka kartu sumber untuk memeriksa aslinya.',
+    general: 'Pengetahuan umum AI', generalText: 'Belum ada peraturan yang cocok di Taxora, jadi jawaban berasal dari pengetahuan umum AI. Periksa peraturan yang berlaku, terutama tarif dan tenggat waktu.',
+    insufficient: 'Bukti belum memadai', insufficientText: 'Taxora belum bisa mendukung jawaban. Tambahkan detail pada pertanyaan atau ubah kalimatnya.',
+    outOfScope: 'Di luar cakupan', outOfScopeText: 'Taxora hanya menjawab pertanyaan tentang perpajakan Indonesia.',
+    failed: 'Tidak dapat diselesaikan', failedText: 'Layanan AI tidak merespons tepat waktu atau kuota hariannya habis. Coba lagi nanti.',
+    limitsTitle: 'Perlu diingat',
+    limit1: 'Taxora membantu memahami aturan; untuk keputusan yang berdampak, tetap konsultasikan dengan konsultan pajak.',
+    limit2: 'Jangan menulis data pribadi seperti NIK, NPWP, atau nama lengkap.',
+    limit3: 'Knowledge base masih terus bertambah. Pustaka peraturan berisi peraturan yang dapat dikutip Taxora.',
   },
   history: { actions: 'Tindakan untuk {{title}}', rename: 'Ganti nama', renameLabel: 'Nama percakapan', delete: 'Hapus', cancel: 'Batal', confirmTitle: 'Hapus percakapan?', confirmText: '“{{title}}” beserta semua pesannya akan dihapus. Tindakan ini tidak dapat dibatalkan.' },
   account: { menu: 'Akun', unnamed: 'Akun', roles: { user: 'Pengguna', reviewer: 'Reviewer', admin: 'Admin' } },
