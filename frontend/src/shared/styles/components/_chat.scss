@@ -40,3 +40,47 @@
   .message-row.user { grid-template-columns: minmax(0, 1fr) 24px; }
   .message-row.user .user-content { max-width: 88%; }
 }
+
+// Answers rendered from Markdown (MarkdownAnswer). The legacy rule keeps line breaks with pre-wrap,
+// which would double the spacing of rendered paragraphs and lists.
+.message-content.markdown {
+  white-space: normal;
+
+  > :first-child { margin-top: 0; }
+  > :last-child { margin-bottom: 0; }
+
+  p { margin: 0 0 10px; }
+  ul, ol { margin: 4px 0 10px; padding-left: 22px; }
+  li { margin: 3px 0; }
+  li > p { margin: 0; }
+  strong { font-weight: 600; color: #2f3d47; }
+
+  h4, h5 { margin: 14px 0 6px; font-size: 1em; font-weight: 600; color: #2f3d47; }
+  h5 { font-size: .95em; }
+
+  blockquote {
+    margin: 8px 0;
+    padding: 6px 12px;
+    border-left: 3px solid #d7e4db;
+    background: #f7f9f7;
+    color: #5f6b73;
+  }
+
+  code {
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: #eef1f2;
+    font-size: .9em;
+  }
+
+  hr { margin: 12px 0; border: 0; border-top: 1px solid $color-border; }
+}
+
+.md-table {
+  margin: 8px 0 12px;
+  overflow-x: auto;
+
+  table { border-collapse: collapse; min-width: 60%; font-size: .92em; }
+  th, td { padding: 7px 10px; border: 1px solid $color-border; text-align: left; vertical-align: top; }
+  th { background: $color-canvas; font-weight: 600; color: #2f3d47; }
+}

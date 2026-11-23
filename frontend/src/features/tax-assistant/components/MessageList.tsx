@@ -1,7 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { lazy, Suspense, useEffect, useRef } from 'react'
 import { BookOpen, CircleHelp, ShieldCheck, Sparkles, ThumbsDown, ThumbsUp, ArrowUpRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ChatMessage, FeedbackRating } from '../../../shared/types/tax'
+
+// The Markdown renderer is the largest dependency of the app; it loads with the first answer, not at sign-in.
+const MarkdownAnswer = lazy(() => import('./MarkdownAnswer').then(module => ({ default: module.MarkdownAnswer })))
 
 interface Props {
   messages: ChatMessage[]
@@ -28,7 +31,9 @@ export function MessageList({ messages, busy, feedback, onFeedback }: Props) {
       <div className={`message-avatar ${message.role}`}>{message.role === 'assistant' ? <span className="mini-mark" /> : 'U'}</div>
       <div className="message-body">
         <div className="message-meta"><strong>{message.role === 'assistant' ? t('messages.assistant') : t('messages.user')}</strong>{message.role === 'assistant' && <span className="ai-badge"><Sparkles size={11} /> {t('messages.aiResponse')}</span>}</div>
-        <div className={`message-content ${message.role === 'user' ? 'user-content' : ''}`}>{message.content}</div>
+        {message.role === 'user'
+          ? <div className="message-content user-content">{message.content}</div>
+          : <Suspense fallback={<div className="message-content">{message.content}</div>}><MarkdownAnswer text={message.content} /></Suspense>}
         {message.role === 'assistant' && <>
           {message.status && message.status !== 'answered' && <div className={`answer-status ${message.status}`}><CircleHelp size={15} /><span>{t(STATUS_LABELS[message.status] ?? 'messages.failed')}</span></div>}
           {!!message.missing?.length && <div className="answer-note"><strong>{t('messages.clarify')}</strong>{message.missing.map(item => <span key={item}>• {item}</span>)}</div>}
