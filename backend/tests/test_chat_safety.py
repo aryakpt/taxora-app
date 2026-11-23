@@ -326,3 +326,17 @@ def test_answers_are_asked_for_in_markdown_without_links_or_html():
     for allow_general in (False, True):
         prompt = system_prompt("id", allow_general)
         assert "Markdown" in prompt and "No links, images, or HTML" in prompt
+
+
+@pytest.mark.parametrize(("kind", "number", "label"), [
+    ("article", "2", "Pasal 2"),
+    ("article", "I", "Pasal I"),
+    ("elucidation", "2", "Penjelasan Pasal 2"),
+    ("elucidation", None, "Penjelasan Umum"),
+    ("attachment", None, "Lampiran"),
+    ("preamble", None, None),
+])
+def test_sources_say_whether_they_cite_an_article_its_elucidation_or_an_attachment(kind, number, label):
+    from app.modules.retrieval.service import provision_label
+
+    assert provision_label(kind, number) == label

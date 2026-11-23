@@ -26,6 +26,15 @@ STOPWORDS = frozenset(
 REGULATION_NUMBER = re.compile(r"[^\W_]+(?:[/.-][^\W_]+)*/[^\W_]+(?:[/.-][^\W_]+)*")
 
 
+def provision_label(kind: str, number: str | None) -> str | None:
+    """How a provision is cited: "Pasal 2", "Penjelasan Pasal 2", "Penjelasan Umum", "Lampiran"."""
+    if kind == "elucidation":
+        return f"Penjelasan Pasal {number}" if number else "Penjelasan Umum"
+    if kind == "attachment":
+        return "Lampiran"
+    return f"Pasal {number}" if number else None
+
+
 def keyword_tsquery(question: str) -> str | None:
     """OR-query of meaningful terms. A plain AND query would demand every word of a long natural
     question, which almost never matches. Terms are reduced to letters and digits (plus whole
@@ -53,6 +62,7 @@ async def hybrid_search(
         select(
             DocumentChunk.id.label("chunk_id"),
             DocumentChunk.chunk_text,
+            LegalProvision.provision_type,
             LegalProvision.article_number,
             LegalProvision.paragraph_number,
             RegulationVersion.source_url,
@@ -105,7 +115,8 @@ async def hybrid_search(
             "id": row.chunk_id,
             "text": row.chunk_text,
             "regulation": f"{row.regulation_number} — {row.title}",
-            "article": f"Pasal {row.article_number}" if row.article_number else None,
+            "article": provision_label(row.provision_type, row.article_number),
+            "provision_type": row.provision_type,
             "article_number": row.article_number,
             "paragraph": row.paragraph_number,
             "source_url": row.source_url,
