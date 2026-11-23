@@ -74,7 +74,7 @@ export interface MetadataCorrectionEntry {
 
 export interface ExtractedSection {
   id: string
-  kind: 'preamble' | 'article' | 'attachment'
+  kind: 'preamble' | 'article' | 'attachment' | 'elucidation'
   number: string | null
   text: string
   chunks: number

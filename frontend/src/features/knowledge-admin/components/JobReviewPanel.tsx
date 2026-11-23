@@ -63,6 +63,11 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onError, onClose 
   }
 
   const correctable = isAdmin && !!job.version && (job.status === 'approved' || job.status === 'published')
+  const sectionLabel = (section: ExtractedSection) => {
+    if (section.kind === 'article') return t('admin.review.article', { number: section.number })
+    if (section.kind === 'elucidation' && section.number) return t('admin.review.elucidationOf', { number: section.number })
+    return t(`admin.review.kinds.${section.kind}`)
+  }
   const datesChanged = JSON.stringify(dates) !== serverDates
   const setDate = (key: keyof VersionDates, value: string) => setDates(current => ({ ...current, [key]: value || null }))
 
@@ -108,7 +113,7 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onError, onClose 
       {sections === null ? <p className="muted">{t('common.loading')}</p> : sections.map(section =>
         <details key={section.id}>
           <summary>
-            <strong>{section.kind === 'article' ? t('admin.review.article', { number: section.number }) : t(`admin.review.kinds.${section.kind}`)}</strong>
+            <strong>{sectionLabel(section)}</strong>
             <span>{t('admin.review.sectionMeta', { chars: section.text.length.toLocaleString(i18n.resolvedLanguage), chunks: section.chunks })}</span>
           </summary>
           <pre>{section.text}</pre>

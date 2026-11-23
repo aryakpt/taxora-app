@@ -135,6 +135,54 @@ def test_chapter_headings_are_not_part_of_the_article_before_them():
         ("3", "Isi pasal tiga."), ("4", "Isi pasal empat.")]
 
 
+UU_WITH_ELUCIDATION = "\n".join([
+    "UNDANG-UNDANG NOMOR 1 TAHUN 2026", "Menimbang: contoh.",
+    "Pasal 1", "Dalam undang-undang ini yang dimaksud dengan pajak adalah kontribusi wajib.",
+    "Pasal 2", "Tarif pajak ditetapkan sebesar sepuluh persen.",
+    "Disahkan di Jakarta",
+    "PENJELASAN", "ATAS", "UNDANG-UNDANG NOMOR 1 TAHUN 2026",
+    "I. UMUM", "Undang-undang ini menyederhanakan Pasal 2 undang-undang lama.",
+    "II. PASAL DEMI PASAL",
+    "Pasal 1", "Cukup jelas.",
+    "Pasal 2", "Tarif berlaku untuk seluruh wajib pajak.",
+])
+
+
+def test_the_elucidation_is_kept_apart_from_the_articles_it_explains():
+    sections = structural_sections(UU_WITH_ELUCIDATION)
+
+    assert [(s.kind, s.number) for s in sections] == [
+        ("preamble", None), ("article", "1"), ("article", "2"),
+        ("elucidation", None), ("elucidation", "1"), ("elucidation", "2")]
+    assert sections[2].text.startswith("Tarif pajak ditetapkan") and "PENJELASAN" not in sections[2].text
+    assert sections[3].text.startswith("PENJELASAN") and "II. PASAL DEMI PASAL" in sections[3].text
+    assert sections[5].text == "Tarif berlaku untuk seluruh wajib pajak."
+
+
+def test_an_attachment_after_the_elucidation_is_recognised():
+    sections = structural_sections(UU_WITH_ELUCIDATION + "\nLAMPIRAN\nTABEL TARIF\nsampai Rp5.400.000 0%")
+
+    assert [(s.kind, s.number) for s in sections][-3:] == [
+        ("elucidation", "1"), ("elucidation", "2"), ("attachment", None)]
+    assert sections[-2].text == "Tarif berlaku untuk seluruh wajib pajak."
+
+
+def test_an_attachment_before_the_elucidation_is_recognised():
+    text = UU_WITH_ELUCIDATION.replace("Disahkan di Jakarta", "Disahkan di Jakarta\nLAMPIRAN\nFORMULIR")
+    sections = structural_sections(text)
+
+    assert [(s.kind, s.number) for s in sections] == [
+        ("preamble", None), ("article", "1"), ("article", "2"), ("attachment", None),
+        ("elucidation", None), ("elucidation", "1"), ("elucidation", "2")]
+    assert sections[3].text == "LAMPIRAN\nFORMULIR"
+
+
+def test_the_word_penjelasan_in_an_article_is_not_the_elucidation():
+    sections = structural_sections("Pasal 1\nPenjelasan lebih lanjut diatur dalam PMK.\nPasal 2\nIsi.")
+
+    assert [s.kind for s in sections] == ["article", "article"]
+
+
 def test_the_word_bab_inside_a_sentence_is_not_a_heading():
     sections = structural_sections("Pasal 1\nSebagaimana diatur dalam BAB II dan\nBagian Kedua peraturan ini.\nPasal 2\nIsi.")
 

@@ -58,8 +58,7 @@ def load(name: str = "pmk_28_2026") -> Dataset:
 
 
 def _label(item: dict) -> str:
-    return f"{item['regulation_number']} Pasal {item['article_number']}" if item["article_number"] else \
-        f"{item['regulation_number']} (bagian lain)"
+    return f"{item['regulation_number']} {item['article'] or '(pembukaan)'}"
 
 
 async def evaluate_case(session: AsyncSession, case: Case, embedder: Embedder,
@@ -76,7 +75,8 @@ async def evaluate_case(session: AsyncSession, case: Case, embedder: Embedder,
     if case.expect == "not_in_kb":
         return CaseResult(case.id, case.expect, passed=None, in_scope=True, retrieved=retrieved)
     rank = next((position for position, item in enumerate(evidence, 1)
-                 if item["regulation_number"] == case.regulation and item["article_number"] in case.articles), None)
+                 if item["regulation_number"] == case.regulation and item["provision_type"] == "article"
+                 and item["article_number"] in case.articles), None)
     return CaseResult(case.id, case.expect, passed=rank is not None, in_scope=True, rank=rank, retrieved=retrieved)
 
 
