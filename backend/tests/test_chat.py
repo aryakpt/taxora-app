@@ -199,6 +199,22 @@ async def test_a_failed_attempt_is_retried_and_recorded(client, fake_ai, first_f
     assert llm.attempts == [0, 1]  # the retry asks the LLM client for the next model
 
 
+async def test_used_up_quota_is_not_retried_and_says_when_it_resets(client, fake_ai):
+    from app.modules.generation.llm import QuotaExhausted
+
+    await seed_fixture_regulation()
+    llm = fake_ai.enable_llm(QuotaExhausted(datetime(2026, 11, 24, 0, 0, tzinfo=timezone.utc)))
+    await sign_in(client)
+
+    indonesian = await ask(client, "Berapa tarif pajak atas sewa?", response_language="id")
+    english = await ask(client, "Berapa tarif pajak atas sewa?", response_language="en")
+
+    assert indonesian["answer_status"] == "failed" and len(llm.calls) == 2  # one call per question, no retry
+    assert "Kuota harian" in indonesian["answer"] and "07.00 WIB (24-11-2026)" in indonesian["answer"]
+    assert "quota" in english["answer"] and "07.00 WIB" in english["answer"]
+    assert (await stored_answer()).metadata_json["quota_resets_at"] == "2026-11-24T00:00:00+00:00"
+
+
 async def test_attempts_are_limited(client, fake_ai, monkeypatch):
     monkeypatch.setattr(settings, "llm_attempts", 3)
     await seed_fixture_regulation()

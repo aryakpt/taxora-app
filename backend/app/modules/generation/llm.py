@@ -1,4 +1,6 @@
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Protocol
 
 import openai
@@ -15,6 +17,33 @@ _OPENROUTER_DATA_POLICIES: dict[str, dict | None] = {
 
 class LLMError(Exception):
     """The provider failed, timed out, or returned no content."""
+
+
+class QuotaExhausted(LLMError):
+    """The account's request quota is used up (OpenRouter free tier: 50 or 1000 free-model requests a day).
+    Retrying cannot help until `resets_at`."""
+
+    def __init__(self, resets_at: datetime | None):
+        super().__init__(f"quota exhausted until {resets_at.isoformat() if resets_at else 'unknown'}")
+        self.resets_at = resets_at
+
+
+def quota_exhaustion(exc: openai.APIStatusError) -> QuotaExhausted | None:
+    """Recognise a daily-quota 429 from OpenRouter (as opposed to a briefly rate-limited model)."""
+    if exc.status_code != 429:
+        return None
+    body = exc.body if isinstance(exc.body, dict) else {}
+    error = body.get("error", body) if isinstance(body.get("error", body), dict) else {}
+    metadata = error.get("metadata") or {}
+    daily = metadata.get("limit_source") == "openrouter_free_tier_daily" or "per-day" in str(error.get("message", ""))
+    if not daily:
+        return None
+    reset = (metadata.get("headers") or {}).get("X-RateLimit-Reset") or exc.response.headers.get("x-ratelimit-reset")
+    try:
+        resets_at = datetime.fromtimestamp(int(reset) / 1000, timezone.utc)
+    except (TypeError, ValueError):
+        resets_at = None
+    return QuotaExhausted(resets_at)
 
 
 @dataclass(frozen=True)
@@ -36,6 +65,8 @@ class OpenAICompatibleLLM:
         self.model = model
         self.models = list(dict.fromkeys([model, *(fallback_models or [])]))
         self._base_url = base_url
+        # Once the quota is used up, fail at once until it resets instead of calling the provider again.
+        self._quota_exhausted: QuotaExhausted | None = None
         self._client = AsyncOpenAI(
             # Retries happen in the chat service, where each one is recorded and may reach another model.
             api_key=api_key, base_url=base_url, timeout=settings.llm_timeout_seconds, max_retries=0
@@ -62,6 +93,9 @@ class OpenAICompatibleLLM:
         return body or None
 
     async def complete_json(self, system: str, user: str, attempt: int = 0) -> LLMReply:
+        if self._quota_exhausted and not _passed(self._quota_exhausted.resets_at):
+            raise self._quota_exhausted
+        self._quota_exhausted = None
         models = self.models_for(attempt)
         try:
             completion = await self._client.chat.completions.create(
@@ -72,6 +106,11 @@ class OpenAICompatibleLLM:
                 messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
                 extra_body=self._extra_body(models),
             )
+        except openai.APIStatusError as exc:
+            if quota := quota_exhaustion(exc):
+                self._quota_exhausted = quota
+                raise quota from exc
+            raise LLMError(f"{type(exc).__name__} ({exc.status_code})") from exc
         except openai.OpenAIError as exc:
             raise LLMError(type(exc).__name__) from exc
         choice = completion.choices[0] if completion.choices else None
@@ -83,3 +122,8 @@ class OpenAICompatibleLLM:
         if not content:
             raise LLMError(f"{served_by}: empty completion")
         return LLMReply(content, served_by)
+
+
+def _passed(moment: datetime | None) -> bool:
+    """An unknown reset time is treated as passed, so the next request simply tries again."""
+    return moment is None or moment.timestamp() <= time.time()

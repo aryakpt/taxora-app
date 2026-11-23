@@ -2,6 +2,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,7 @@ from app.modules.chat.citations import GenerationResult, MalformedOutput, parse_
 from app.modules.chat.schemas import AnswerStatus, ChatRequest, ChatResponse, Claim, Source
 from app.modules.conversations.models import Conversation, Message
 from app.modules.generation import providers
-from app.modules.generation.llm import LLMClient, LLMError
+from app.modules.generation.llm import LLMClient, LLMError, QuotaExhausted
 from app.modules.generation.prompts import PROMPT_VERSION, Turn, system_prompt, user_prompt
 from app.modules.query_understanding.period import reference_date
 from app.modules.query_understanding.scope import assess_scope
@@ -30,6 +31,8 @@ CHAT_COPY = {
         "insufficient": "The available evidence is not sufficient to verify an answer.",
         "failed": "The request could not be processed. Please try again.",
         "llm_unavailable": "The AI service is temporarily unavailable. No answer was generated.",
+        "quota_exhausted": "Today's quota for the AI service has been used up, so no answer was generated. It resets at {time}.",
+        "quota_exhausted_unknown": "The quota for the AI service has been used up, so no answer was generated. Please try again later.",
         "unconfigured": "Relevant sources were found, but the AI service is not configured. An answer cannot be prepared yet.",
         "api_key_required": "LLM_API_KEY must be configured to generate an evidence-based answer.",
         "no_evidence": "I could not find sufficient verified legal sources to answer. Please clarify the topic, transaction, or tax period; a definitive answer cannot be provided from the current knowledge base.",
@@ -41,6 +44,8 @@ CHAT_COPY = {
         "insufficient": "Bukti yang tersedia belum cukup untuk memverifikasi jawaban.",
         "failed": "Permintaan belum dapat diproses. Silakan coba kembali.",
         "llm_unavailable": "Layanan AI sedang tidak tersedia. Tidak ada jawaban yang dibuat.",
+        "quota_exhausted": "Kuota harian layanan AI sudah habis, jadi tidak ada jawaban yang dibuat. Kuota direset pukul {time}.",
+        "quota_exhausted_unknown": "Kuota layanan AI sudah habis, jadi tidak ada jawaban yang dibuat. Silakan coba lagi nanti.",
         "unconfigured": "Sumber terkait ditemukan, tetapi layanan AI belum dikonfigurasi. Jawaban belum dapat disusun.",
         "api_key_required": "Konfigurasi LLM_API_KEY diperlukan untuk menghasilkan jawaban berbasis evidence.",
         "no_evidence": "Saya belum menemukan sumber hukum terverifikasi yang cukup untuk menjawab. Coba perjelas topik, transaksi, atau periode pajak; jawaban definitif tidak dapat diberikan dari knowledge base saat ini.",
@@ -152,6 +157,9 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
     prompt = user_prompt(body.question, evidence, history)
     try:
         result = await _generate(llm, system_prompt(body.response_language), prompt, evidence, request_id, trace)
+    except QuotaExhausted as exc:
+        trace["quota_resets_at"] = exc.resets_at.isoformat() if exc.resets_at else None
+        return Outcome(AnswerStatus.failed, _quota_message(copy, exc), evidence=evidence, trace=trace)
     except LLMError:
         return Outcome(AnswerStatus.failed, copy["llm_unavailable"], evidence=evidence, trace=trace)
     except MalformedOutput:
@@ -175,9 +183,20 @@ async def _generate(llm: LLMClient, system: str, prompt: str, evidence: list[dic
             errors.append(f"{type(exc).__name__}: {exc}"[:200])
             trace["llm_errors"] = errors
             logger.warning("llm attempt %s failed request_id=%s error=%s", attempt, request_id, exc)
-            if attempt >= settings.llm_attempts:
-                raise
+            if isinstance(exc, QuotaExhausted) or attempt >= settings.llm_attempts:
+                raise  # another attempt cannot succeed before the quota resets
     raise AssertionError("unreachable")
+
+
+# Shown in Indonesian time: Taxora's users are in Indonesia.
+DISPLAY_TIMEZONE = ZoneInfo("Asia/Jakarta")
+
+
+def _quota_message(copy: dict, exc: QuotaExhausted) -> str:
+    if exc.resets_at is None:
+        return copy["quota_exhausted_unknown"]
+    local = exc.resets_at.astimezone(DISPLAY_TIMEZONE)
+    return copy["quota_exhausted"].format(time=f"{local:%H.%M} WIB ({local:%d-%m-%Y})")
 
 
 def _from_generation(result: GenerationResult, evidence: list[dict], copy: dict, trace: dict) -> Outcome:
