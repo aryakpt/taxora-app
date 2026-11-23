@@ -1,4 +1,4 @@
-import { BookOpen, MessageSquarePlus, Plus, Search, Settings, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { BookOpen, Search, Settings, ShieldCheck, Sparkles, SquarePen, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canReview, type AuthUser } from '../auth/AuthProvider'
@@ -28,7 +28,7 @@ export function AppSidebar({ activeConversation, conversations, user, mobileOpen
   return <>
     <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="brand"><div className="brand-mark"><span /></div><span className="brand-name">taxora</span><button aria-label={t('navigation.closeNavigation')} className="icon-btn mobile-close" onClick={onCloseMobile}><X size={18} /></button></div>
-      <button className="new-chat" onClick={onNewChat}><MessageSquarePlus size={17} /><span>{t('navigation.newConversation')}</span><Plus className="new-plus" size={16} /></button>
+      <button className="new-chat" onClick={onNewChat}><SquarePen size={16} aria-hidden="true" /><span>{t('navigation.newConversation')}</span></button>
       <div className="nav-label">{t('navigation.workspace')}</div>
       <nav className="primary-nav" aria-label={t('navigation.workspace')}>
         <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Sparkles size={17} /><span>{t('navigation.taxAssistant')}</span></NavLink>
