@@ -9,12 +9,13 @@ out the admin's request. Nothing reaches retrieval until a version is published.
 
 import logging
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import User
@@ -239,13 +240,17 @@ def _date(value: str | None) -> date | None:
 async def recover_interrupted_jobs() -> int:
     """At startup, jobs left queued/processing by a stopped server are marked failed (retryable).
 
-    Assumes a single API process: background jobs run in-process (FastAPI BackgroundTasks). With several
-    workers, move processing to a dedicated job queue before relying on this.
+    On a single long-running server every such job is orphaned. On serverless hosting other instances may
+    be processing right now, so only jobs untouched for INGESTION_STALE_MINUTES count (longer than a request
+    may run).
     """
+    stuck = IngestionJob.status.in_([JobStatus.queued.value, JobStatus.processing.value])
+    if settings.ingestion_stale_minutes:
+        stuck &= IngestionJob.updated_at < func.now() - timedelta(minutes=settings.ingestion_stale_minutes)
     async with SessionLocal() as session, session.begin():
         result = await session.execute(
             update(IngestionJob)
-            .where(IngestionJob.status.in_([JobStatus.queued.value, JobStatus.processing.value]))
+            .where(stuck)
             .values(status=JobStatus.failed.value,
                     error="Proses terhenti karena server dimulai ulang. Gunakan retry untuk memproses ulang.")
         )

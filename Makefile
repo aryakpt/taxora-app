@@ -2,7 +2,7 @@ BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 
 .PHONY: help db-up db-down db-reset install migrate api web test lint check set-role seed ask-raw eval eval-draft reprocess reindex \
-	prod prod-migrate deploy-render-env deploy-render deploy-status deploy-web
+	prod prod-migrate deploy-env deploy deploy-logs
 
 help:  ## List available commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -75,14 +75,11 @@ prod:  ## Run an app.cli command against production, e.g. make prod CMD="set-rol
 prod-migrate:  ## Apply database migrations to production
 	$(PROD) .venv/bin/alembic upgrade head
 
-deploy-render-env:  ## Send the API's secrets to Render, then redeploy
-	cd deploy && ../$(PY) render.py env
+deploy-env:  ## Set Vercel's production variables (secrets included) from deploy/.env.production
+	cd deploy && ../$(PY) vercel.py env
 
-deploy-render:  ## Redeploy the API on Render (latest commit of its branch)
-	cd deploy && ../$(PY) render.py deploy
+deploy:  ## Build and deploy the frontend and the API to Vercel production
+	cd deploy && ../$(PY) vercel.py deploy
 
-deploy-status:  ## The API's URL and its latest deploys on Render
-	cd deploy && ../$(PY) render.py status
-
-deploy-web:  ## Build and deploy the frontend to Vercel production
-	cd deploy && ../$(PY) vercel.py
+deploy-logs:  ## Recent runtime logs of the production deployment
+	cd deploy && ../$(PY) vercel.py logs

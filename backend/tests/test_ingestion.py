@@ -453,3 +453,35 @@ async def test_keyword_search_uses_the_full_text_index(client, source):
             "WHERE to_tsvector('simple'::regconfig, chunk_text) @@ to_tsquery('simple'::regconfig, 'sewa')"
         ))).scalars())
     assert "ix_document_chunks_fts" in plan
+
+
+# --- serverless hosting (INGESTION_INLINE, INGESTION_STALE_MINUTES) ---------------------------------
+
+async def test_inline_ingestion_answers_with_the_processed_job(client, source, monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ingestion_inline", True)
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+
+    response = await client.post("/api/v1/admin/ingestion", json=METADATA)
+
+    assert response.status_code == 202
+    assert response.json()["status"] == "review_required" and await count(DocumentChunk) == 3
+
+
+async def test_with_a_stale_limit_only_old_unfinished_jobs_are_failed(monkeypatch):
+    from app.core.config import settings
+
+    monkeypatch.setattr(settings, "ingestion_stale_minutes", 10)
+    async with SessionLocal() as session, session.begin():
+        session.add(IngestionJob(source_url=URL, status=JobStatus.processing.value))  # another instance's
+        old = IngestionJob(source_url=URL, status=JobStatus.processing.value)
+        session.add(old)
+    async with SessionLocal() as session, session.begin():
+        await session.execute(text("UPDATE ingestion_jobs SET updated_at = now() - interval '11 minutes' "
+                                   "WHERE id = :id"), {"id": old.id})
+
+    assert await recover_interrupted_jobs() == 1
+    async with SessionLocal() as session:
+        statuses = sorted((await session.scalars(select(IngestionJob.status))).all())
+    assert statuses == ["failed", "processing"]
