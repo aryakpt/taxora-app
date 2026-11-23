@@ -75,6 +75,7 @@ export interface ExtractedSection {
 export interface ChatResponse {
   request_id: string
   conversation_id: string
+  message_id: string
   answer_status: string
   answer: string
   sources?: Source[]

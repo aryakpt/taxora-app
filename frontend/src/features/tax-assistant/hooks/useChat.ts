@@ -18,25 +18,16 @@ export function useChat({ request, conversationId, setConversationId, messages, 
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<Record<string, FeedbackRating>>({})
 
-  const sendQuestion = useCallback(async (text: string, period: string, taxpayer: string, responseLanguage: ResponseLanguage) => {
+  const sendQuestion = useCallback(async (text: string, responseLanguage: ResponseLanguage) => {
     const question = text.trim()
     if (!question || busy) return false
     setBusy(true)
     setMessages(current => [...current, { role: 'user', content: question }])
     try {
-      const result = await api.ask(conversationId, question, {
-        tax_period: period || null,
-        taxpayer_type: taxpayer || null,
-        transaction_type: null,
-      }, responseLanguage)
+      const result = await api.ask(conversationId, question, responseLanguage)
       setConversationId(result.conversation_id)
-      let messageId = result.request_id
-      try {
-        const history = await request<{ messages: Array<{ id: string; role: string }> }>(`/api/v1/conversations/${result.conversation_id}`)
-        messageId = [...history.messages].reverse().find(message => message.role === 'assistant')?.id || messageId
-      } catch { /* Chat remains usable when the history endpoint cannot be refreshed. */ }
       setMessages(current => [...current, {
-        id: messageId,
+        id: result.message_id,
         role: 'assistant',
         content: result.answer,
         sources: result.sources || [],
@@ -54,7 +45,7 @@ export function useChat({ request, conversationId, setConversationId, messages, 
     } finally {
       setBusy(false)
     }
-  }, [api, busy, conversationId, messages.length, onError, refreshConversations, request, setConversationId, setMessages])
+  }, [api, busy, conversationId, messages.length, onError, refreshConversations, setConversationId, setMessages])
 
   const submitFeedback = useCallback(async (messageId: string | undefined, rating: FeedbackRating) => {
     if (!messageId) return

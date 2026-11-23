@@ -28,9 +28,11 @@ class FakeLLM:
     def __init__(self):
         self.response: str | Exception | list[str | Exception] = "{}"
         self.calls: list[tuple[str, str]] = []
+        self.attempts: list[int] = []
 
-    async def complete_json(self, system: str, user: str) -> LLMReply:
+    async def complete_json(self, system: str, user: str, attempt: int = 0) -> LLMReply:
         self.calls.append((system, user))
+        self.attempts.append(attempt)
         responses = self.response if isinstance(self.response, list) else [self.response]
         result = responses[min(len(self.calls), len(responses)) - 1]
         if isinstance(result, Exception):

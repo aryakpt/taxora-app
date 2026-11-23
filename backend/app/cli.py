@@ -85,9 +85,9 @@ async def ask_raw(question: str) -> tuple[str, str]:
     if llm is None:
         raise CommandError("LLM_API_KEY is not set in backend/.env.")
     errors = []
-    for _ in range(max(1, settings.llm_attempts)):  # same retry policy as the chat, for a fair comparison
+    for attempt in range(max(1, settings.llm_attempts)):  # same retry policy as the chat, for a fair comparison
         try:
-            reply = await llm.complete_json(RAW_SYSTEM_PROMPT, question)
+            reply = await llm.complete_json(RAW_SYSTEM_PROMPT, question, attempt)
             break
         except LLMError as exc:
             errors.append(str(exc))

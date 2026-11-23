@@ -9,7 +9,7 @@ interface Props {
   busy: boolean
   error: string
   feedback: Record<string, FeedbackRating>
-  onSend: (question: string, period: string, taxpayer: string) => void
+  onSend: (question: string) => void
   onFeedback: (id: string | undefined, rating: FeedbackRating) => void
   onDismissError: () => void
 }
@@ -33,7 +33,7 @@ function Welcome({ onSend }: Pick<Props, 'onSend'>) {
     <p className="welcome-subtitle">{t('chat.subtitle')}</p>
     <div className="trust-chips"><span><ShieldCheck size={14} /> {t('chat.evidenceGrounded')}</span><span><FileText size={14} /> {t('chat.sourceCited')}</span><span><History size={14} /> {t('chat.periodAware')}</span></div>
     <div className="prompt-heading"><span>{t('chat.promptHeading')}</span><span className="prompt-hint">{t('chat.promptHint')}</span></div>
-    <div className="suggestion-grid">{promptKeys.map((key, index) => <button key={key} className="suggestion-card" onClick={() => onSend(t(`chat.prompts.${key}.question`), '', '')}><span className="suggestion-number">0{index + 1}</span><span className="suggestion-label">{t(`chat.prompts.${key}.label`)}</span><ArrowUpRight size={15} /><span className="suggestion-text">{t(`chat.prompts.${key}.question`)}</span></button>)}</div>
+    <div className="suggestion-grid">{promptKeys.map((key, index) => <button key={key} className="suggestion-card" onClick={() => onSend(t(`chat.prompts.${key}.question`))}><span className="suggestion-number">0{index + 1}</span><span className="suggestion-label">{t(`chat.prompts.${key}.label`)}</span><ArrowUpRight size={15} /><span className="suggestion-text">{t(`chat.prompts.${key}.question`)}</span></button>)}</div>
     <div className="welcome-disclaimer"><ShieldCheck size={14} /> {t('chat.disclaimer')}</div>
   </section>
 }

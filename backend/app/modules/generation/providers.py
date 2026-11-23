@@ -15,7 +15,8 @@ def get_embedder() -> Embedder:
 
 @lru_cache(maxsize=1)
 def _configured_llm() -> LLMClient:
-    return OpenAICompatibleLLM(settings.llm_api_key, settings.llm_base_url, settings.llm_model)
+    return OpenAICompatibleLLM(settings.llm_api_key, settings.llm_base_url, settings.llm_model,
+                               settings.llm_fallback_models)
 
 
 def get_llm() -> LLMClient | None:

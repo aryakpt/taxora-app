@@ -14,16 +14,10 @@ class AnswerStatus(str, Enum):
     failed = "failed"
 
 
-class TaxContext(BaseModel):
-    tax_period: str | None = Field(default=None, max_length=20)
-    taxpayer_type: str | None = Field(default=None, max_length=50)
-    transaction_type: str | None = Field(default=None, max_length=100)
-
-
 class ChatRequest(BaseModel):
     conversation_id: UUID | None = None
+    # Everything about the case (tax year, taxpayer, transaction) comes from the question itself.
     question: str = Field(min_length=3, max_length=4000)
-    context: TaxContext = Field(default_factory=TaxContext)
     response_language: Literal["en", "id"] = "id"
 
 
@@ -48,6 +42,7 @@ class Source(BaseModel):
 class ChatResponse(BaseModel):
     request_id: UUID
     conversation_id: UUID
+    message_id: UUID  # the stored answer, for feedback
     answer_status: AnswerStatus
     answer: str
     claims: list[Claim] = []
