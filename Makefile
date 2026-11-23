@@ -2,7 +2,7 @@ BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 
 .PHONY: help db-up db-down db-reset install migrate api web test lint check set-role seed ask-raw eval eval-draft reprocess reindex \
-	prod prod-migrate deploy-render-env deploy-render deploy-status deploy-web
+	prod prod-migrate deploy-api-env deploy-api deploy-status deploy-logs deploy-github deploy-web
 
 help:  ## List available commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -75,14 +75,20 @@ prod:  ## Run an app.cli command against production, e.g. make prod CMD="set-rol
 prod-migrate:  ## Apply database migrations to production
 	$(PROD) .venv/bin/alembic upgrade head
 
-deploy-render-env:  ## Send the API's secrets to Render, then redeploy
-	cd deploy && ../$(PY) render.py env
+deploy-api-env:  ## Create the API's Hugging Face Space if needed and set its settings and secrets
+	cd deploy && ../$(PY) huggingface.py env
 
-deploy-render:  ## Redeploy the API on Render (latest commit of its branch)
-	cd deploy && ../$(PY) render.py deploy
+deploy-api:  ## Upload backend/ to the Space (it rebuilds); GitHub Actions does this on every merge to main
+	cd deploy && ../$(PY) huggingface.py push
 
-deploy-status:  ## The API's URL and its latest deploys on Render
-	cd deploy && ../$(PY) render.py status
+deploy-status:  ## The Space's build/run stage and the API's URL
+	cd deploy && ../$(PY) huggingface.py status
+
+deploy-logs:  ## The last lines of the API's log on the Space
+	cd deploy && ../$(PY) huggingface.py logs
+
+deploy-github:  ## Give GitHub Actions the token to deploy the API on every merge to main
+	cd deploy && ../$(PY) huggingface.py github
 
 deploy-web:  ## Build and deploy the frontend to Vercel production
 	cd deploy && ../$(PY) vercel.py

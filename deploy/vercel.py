@@ -2,7 +2,7 @@
 
 The token goes to the Vercel CLI through its environment, so it never appears in a command line or log.
 The first run links frontend/ to a Vercel project (created if needed); frontend/vercel.json holds the
-build settings and the /api rewrite to the Render API.
+build settings and the /api rewrite to the API on Hugging Face.
 """
 
 import os

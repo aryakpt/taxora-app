@@ -45,7 +45,7 @@ def production_env(values: dict[str, str]) -> dict[str, str]:
     return {
         "APP_ENV": "production",
         "AUTH_COOKIE_SECURE": "true",
-        # Commands run here sign no sessions; the API's real key lives only on Render.
+        # Commands run here sign no sessions; the API's real key lives only in the Space's secrets.
         "AUTH_SECRET_KEY": secrets.token_hex(32),
         "DATABASE_URL": database_url(values["SUPABASE_DB_POOLER_URL"], values["SUPABASE_DB_PASSWORD"]),
         "SUPABASE_URL": values["SUPABASE_URL"],

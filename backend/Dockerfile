@@ -1,4 +1,4 @@
-# Taxora API. Built by Render from backend/ (see render.yaml); also runs anywhere Docker does.
+# Taxora API. Deployed as a Hugging Face Docker Space (deploy/huggingface.py); runs anywhere Docker does.
 FROM python:3.10-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -11,7 +11,8 @@ COPY alembic.ini start.sh ./
 COPY migrations ./migrations
 COPY app ./app
 
-RUN useradd --create-home --uid 10001 taxora
+# Hugging Face runs Spaces as user id 1000.
+RUN useradd --create-home --uid 1000 taxora
 USER taxora
 
 EXPOSE 8000

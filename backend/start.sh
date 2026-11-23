@@ -1,7 +1,7 @@
 #!/bin/sh
 # Container entrypoint: bring the database and storage up to date, then serve.
-# Migrations run here because Render's free plan has no pre-deploy step. That is safe with one instance (the
-# free plan runs one); with several, move this to a pre-deploy command so two never migrate at once.
+# Migrations run here because the host has no pre-deploy step. That is safe with one instance (a free Space
+# runs one); with several, move this to a pre-deploy step so two never migrate at once.
 set -e
 alembic upgrade head
 python -m app.cli prepare-storage
