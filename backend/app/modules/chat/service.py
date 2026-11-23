@@ -39,6 +39,7 @@ CHAT_COPY = {
         "no_verified_evidence": "The knowledge base does not contain relevant verified evidence.",
         "out_of_scope": "I can only help with questions about Indonesian taxation, specifically Income Tax (PPh) and Value Added Tax (PPN). Please ask a tax question.",
         "claims_removed": "Some statements could not be verified against the sources and were removed.",
+        "general_notice": "This answer comes from the AI's general knowledge and has not been verified against regulations in Taxora's knowledge base. Check the current regulation, especially for rates, thresholds, and deadlines.",
     },
     "id": {
         "insufficient": "Bukti yang tersedia belum cukup untuk memverifikasi jawaban.",
@@ -52,6 +53,7 @@ CHAT_COPY = {
         "no_verified_evidence": "Knowledge base belum memuat evidence terverifikasi yang relevan.",
         "out_of_scope": "Saya hanya dapat membantu pertanyaan seputar perpajakan Indonesia, khususnya Pajak Penghasilan (PPh) dan Pajak Pertambahan Nilai (PPN). Silakan ajukan pertanyaan perpajakan.",
         "claims_removed": "Sebagian pernyataan tidak dapat diverifikasi terhadap sumber dan telah dihapus.",
+        "general_notice": "Jawaban ini berasal dari pengetahuan umum AI dan belum diverifikasi dengan peraturan di knowledge base Taxora. Periksa peraturan yang berlaku, terutama untuk tarif, batasan, dan tenggat waktu.",
     },
 }
 
@@ -146,17 +148,20 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
     as_of = reference_date(search_text)
     trace["reference_date"] = as_of.isoformat()
     evidence = await hybrid_search(session, search_text, user.id, as_of, embedder)
-    if not evidence:
+    allow_general = settings.chat_allow_general_answers
+    trace["general_answers_allowed"] = allow_general
+    llm = providers.get_llm()
+    if not evidence and (not allow_general or llm is None):
         return Outcome(AnswerStatus.insufficient_evidence, copy["no_evidence"],
                        limitations=[copy["no_verified_evidence"]], trace=trace)
-    llm = providers.get_llm()
     if llm is None:
         return Outcome(AnswerStatus.insufficient_evidence, copy["unconfigured"],
                        limitations=[copy["api_key_required"]], evidence=evidence, trace=trace)
 
     prompt = user_prompt(body.question, evidence, history)
     try:
-        result = await _generate(llm, system_prompt(body.response_language), prompt, evidence, request_id, trace)
+        result = await _generate(llm, system_prompt(body.response_language, allow_general), prompt, evidence,
+                                 request_id, trace)
     except QuotaExhausted as exc:
         trace["quota_resets_at"] = exc.resets_at.isoformat() if exc.resets_at else None
         return Outcome(AnswerStatus.failed, _quota_message(copy, exc), evidence=evidence, trace=trace)
@@ -165,7 +170,7 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
     except MalformedOutput:
         return Outcome(AnswerStatus.failed, copy["failed"], evidence=evidence, trace=trace)
     trace["rejected_claims"] = result.rejected_claims
-    return _from_generation(result, evidence, copy, trace)
+    return _from_generation(result, evidence, copy, trace, allow_general)
 
 
 async def _generate(llm: LLMClient, system: str, prompt: str, evidence: list[dict], request_id: uuid.UUID,
@@ -199,10 +204,15 @@ def _quota_message(copy: dict, exc: QuotaExhausted) -> str:
     return copy["quota_exhausted"].format(time=f"{local:%H.%M} WIB ({local:%d-%m-%Y})")
 
 
-def _from_generation(result: GenerationResult, evidence: list[dict], copy: dict, trace: dict) -> Outcome:
+def _from_generation(result: GenerationResult, evidence: list[dict], copy: dict, trace: dict,
+                     allow_general: bool = False) -> Outcome:
     if not result.in_scope:
         # The model's own text is discarded: only the fixed refusal is shown.
         return Outcome(AnswerStatus.out_of_scope, copy["out_of_scope"], evidence=evidence, trace=trace)
+    if not result.claims and allow_general and result.answer:
+        # No statement could be tied to a quoted regulation: show the answer, clearly labelled as unverified.
+        return Outcome(AnswerStatus.general_answer, result.answer, missing=result.missing_information,
+                       limitations=[copy["general_notice"], *result.limitations], evidence=evidence, trace=trace)
     if not result.claims:
         return Outcome(AnswerStatus.insufficient_evidence, copy["insufficient"],
                        limitations=result.limitations, evidence=evidence, trace=trace)

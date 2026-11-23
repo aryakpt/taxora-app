@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     # off-topic one reach retrieval and the LLM's own scope rule.
     scope_min_similarity: float = 0.33
     chat_requests_per_hour: int = 20
+    # True: tax questions the knowledge base cannot answer get a general-knowledge answer, labelled as not
+    # verified against regulations (status general_answer). False: such questions get insufficient_evidence.
+    # Off-topic questions are refused either way.
+    chat_allow_general_answers: bool = True
 
     # Ingestion. Source URLs must be https on one of these hosts (or their subdomains); redirects are
     # re-checked at every hop. Set as JSON in .env, e.g. INGESTION_ALLOWED_HOSTS='["peraturan.bpk.go.id"]'.
