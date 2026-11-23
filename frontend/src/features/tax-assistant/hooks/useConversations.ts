@@ -25,5 +25,16 @@ export function useConversations(request: ApiRequest, token: string) {
     setMessages([])
   }, [])
 
-  return { conversations, setConversations, activeId, setActiveId, messages, setMessages, refresh, open, startNew }
+  const rename = useCallback(async (id: string, title: string) => {
+    const renamed = await api.rename(id, title)
+    setConversations(current => current.map(item => item.id === id ? { ...item, title: renamed.title } : item))
+  }, [])
+
+  const remove = useCallback(async (id: string) => {
+    await api.remove(id)
+    setConversations(current => current.filter(item => item.id !== id))
+    if (activeId === id) startNew()
+  }, [activeId, startNew])
+
+  return { conversations, setConversations, activeId, setActiveId, messages, setMessages, refresh, open, startNew, rename, remove }
 }

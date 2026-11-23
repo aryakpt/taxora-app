@@ -1,8 +1,9 @@
-import { BookOpen, History, MessageSquarePlus, Plus, Search, Settings, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { BookOpen, MessageSquarePlus, Plus, Search, Settings, ShieldCheck, Sparkles, X } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { canReview, type AuthUser } from '../auth/AuthProvider'
 import { AccountMenu } from './AccountMenu'
+import { ConversationItem } from './ConversationItem'
 import type { ConversationSummary } from '../types/tax'
 
 interface Props {
@@ -12,11 +13,13 @@ interface Props {
   mobileOpen: boolean
   onNewChat: () => void
   onOpenConversation: (id: string) => void
+  onRenameConversation: (id: string, title: string) => Promise<boolean>
+  onDeleteConversation: (id: string) => Promise<boolean>
   onSignOut: () => void
   onCloseMobile: () => void
 }
 
-export function AppSidebar({ activeConversation, conversations, user, mobileOpen, onNewChat, onOpenConversation, onSignOut, onCloseMobile }: Props) {
+export function AppSidebar({ activeConversation, conversations, user, mobileOpen, onNewChat, onOpenConversation, onRenameConversation, onDeleteConversation, onSignOut, onCloseMobile }: Props) {
   const { t } = useTranslation()
   return <>
     <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
@@ -29,7 +32,7 @@ export function AppSidebar({ activeConversation, conversations, user, mobileOpen
         {canReview(user) && <NavLink to="/admin" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Settings size={17} /><span>{t('navigation.knowledgeAdmin')}</span></NavLink>}
       </nav>
       <div className="history-heading"><span>{t('navigation.recent')}</span><button aria-label={t('navigation.searchConversations')} title={t('navigation.searchConversations')} className="icon-btn"><Search size={15} /></button></div>
-      <div className="history-list">{conversations.length ? conversations.map(item => <button key={item.id} className={`history-item ${activeConversation === item.id ? 'selected' : ''}`} onClick={() => onOpenConversation(item.id)}><History size={15} /><span>{item.title}</span></button>) : <p className="history-empty">{t('navigation.emptyHistory')}</p>}</div>
+      <div className="history-list">{conversations.length ? conversations.map(item => <ConversationItem key={item.id} item={item} selected={activeConversation === item.id} onOpen={() => onOpenConversation(item.id)} onRename={title => onRenameConversation(item.id, title)} onDelete={() => onDeleteConversation(item.id)} />) : <p className="history-empty">{t('navigation.emptyHistory')}</p>}</div>
       <div className="sidebar-bottom"><div className="privacy-note"><ShieldCheck size={16} /><div><strong>{t('navigation.evidenceFirst')}</strong><span>{t('navigation.sourcesToVerify')}</span></div></div><AccountMenu user={user} onSignOut={onSignOut} /></div>
     </aside>
     {mobileOpen && <button className="mobile-scrim" aria-label={t('common.close')} onClick={onCloseMobile} />}

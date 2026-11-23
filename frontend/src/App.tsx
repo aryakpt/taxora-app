@@ -37,6 +37,26 @@ export default function App() {
     setMobileNavOpen(false);
   }
 
+  async function renameConversation(id: string, title: string) {
+    try {
+      await history.rename(id, title);
+      return true;
+    } catch (renameError) {
+      setError((renameError as Error).message);
+      return false;
+    }
+  }
+
+  async function deleteConversation(id: string) {
+    try {
+      await history.remove(id);
+      return true;
+    } catch (deleteError) {
+      setError((deleteError as Error).message);
+      return false;
+    }
+  }
+
   async function selectConversation(id: string) {
     try {
       await history.open(id);
@@ -74,6 +94,8 @@ export default function App() {
         mobileOpen={mobileNavOpen}
         onNewChat={newConversation}
         onOpenConversation={selectConversation}
+        onRenameConversation={renameConversation}
+        onDeleteConversation={deleteConversation}
         onSignOut={() => void signOut()}
         onCloseMobile={() => setMobileNavOpen(false)}
       />
