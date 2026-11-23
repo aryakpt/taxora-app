@@ -1,7 +1,7 @@
 BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 
-.PHONY: help db-up db-down db-reset install migrate api web test lint set-role seed ask-raw eval eval-draft reprocess
+.PHONY: help db-up db-down db-reset install migrate api web test lint check set-role seed ask-raw eval eval-draft reprocess
 
 help:  ## List available commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-11s %s\n", $$1, $$2}'
@@ -55,3 +55,8 @@ reprocess:  ## Re-extract a document still under review with the current extract
 
 lint:  ## Lint backend code
 	cd $(BACKEND) && .venv/bin/ruff check app tests
+
+check:  ## Everything CI runs: lint, all tests (database required), frontend build
+	cd $(BACKEND) && .venv/bin/ruff check .
+	cd $(BACKEND) && REQUIRE_TEST_DATABASE=1 .venv/bin/pytest -q
+	cd frontend && npm run build

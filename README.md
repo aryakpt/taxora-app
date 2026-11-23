@@ -124,6 +124,15 @@ make lint    # ruff
 
 Database tests run against the `taxora_test` database (override with `TEST_DATABASE_URL`), apply migrations once per run, and truncate tables after each test.
 
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every pull request and on pushes to `main`:
+
+- **Backend**: `ruff check`, then `pytest` against PostgreSQL + pgvector (the same `pgvector/pgvector:pg16` image, with the test database created by `infra/postgres/init/01-databases.sql`). `REQUIRE_TEST_DATABASE=1` makes database tests fail instead of being skipped if the database is unreachable, so a broken setup cannot pass as green.
+- **Frontend**: `npm ci` and `npm run build` (TypeScript type check + production build).
+
+Run the same checks locally with `make check` (needs `make db-up`).
+
 ## Frontend commands
 
 From `frontend/`: `npm run dev`, `npm run build` (type check + production build), `npm run preview`.
