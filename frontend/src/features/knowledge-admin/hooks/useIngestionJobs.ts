@@ -32,5 +32,7 @@ export function useIngestionJobs(api: IngestionApi, onError: (message: string) =
       : [job, ...current])
   }, [])
 
-  return { jobs, loading, processing, refresh, replace }
+  const removeJob = useCallback((id: string) => setJobs(current => current.filter(item => item.id !== id)), [])
+
+  return { jobs, loading, processing, refresh, replace, removeJob }
 }

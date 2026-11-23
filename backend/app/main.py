@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.core.database import SessionDep
 from app.modules.auth.router import router as auth_router
 from app.modules.chat.router import router as chat_router
+from app.modules.conversations.router import groups_router as conversation_groups_router
 from app.modules.conversations.router import router as conversations_router
 from app.modules.evaluation.router import router as evaluation_router
 from app.modules.feedback.router import router as feedback_router
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
         auth_router,
         chat_router,
         conversations_router,
+        conversation_groups_router,
         regulations_router,
         feedback_router,
         ingestion_router,

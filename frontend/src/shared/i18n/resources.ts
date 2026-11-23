@@ -1,8 +1,9 @@
 const en = {
   language: { select: 'Select language', english: 'English', indonesian: 'Bahasa Indonesia' },
+  theme: { useDark: 'Switch to dark theme', useLight: 'Switch to light theme' },
   common: { documentTitle: 'Taxora — Tax, made clearer', close: 'Close', workspace: 'Workspace', help: 'Help', loading: 'Loading…', published: 'Published', originalSource: 'Original source', refresh: 'Refresh' },
   navigation: {
-    resizeSidebar: 'Resize sidebar', resizeSidebarHint: 'Drag to resize, double-click to reset', closeNavigation: 'Close navigation', openNavigation: 'Open navigation', toggleSidebar: 'Toggle sidebar', newConversation: 'New consultation', workspace: 'WORKSPACE', taxAssistant: 'Tax assistant', regulationLibrary: 'Regulation library', knowledgeAdmin: 'Knowledge admin', recent: 'RECENT', searchConversations: 'Search conversations', emptyHistory: 'Your consultations will appear here.', evidenceFirst: 'Evidence-first answers', sourcesToVerify: 'Sources you can verify.', signOut: 'Sign out', signedIn: 'Signed in',
+    resizeSidebar: 'Resize sidebar', resizeSidebarHint: 'Drag to resize, double-click to reset', closeNavigation: 'Close navigation', openNavigation: 'Open navigation', toggleSidebar: 'Toggle sidebar', newConversation: 'New Consultation', workspace: 'WORKSPACE', taxAssistant: 'Tax Assistant', regulationLibrary: 'Regulation Library', knowledgeAdmin: 'Knowledge Admin', recent: 'RECENT', searchConversations: 'Search conversations', emptyHistory: 'Your consultations will appear here.', evidenceFirst: 'Evidence-first answers', sourcesToVerify: 'Sources you can verify.', signOut: 'Sign out', signedIn: 'Signed in',
   },
   chat: {
     eyebrow: 'YOUR INDONESIAN TAX COMPANION', title: 'Tax, made clearer.', subtitle: 'Grounded guidance on Indonesian tax regulations, with sources you can verify.', evidenceGrounded: 'Evidence-grounded', sourceCited: 'Source-cited', periodAware: 'Period-aware', promptHeading: 'START WITH A QUESTION', promptHint: 'Choose a prompt or write your own', disclaimer: 'Answers are based on available sources and are not a substitute for professional tax advice.',
@@ -34,6 +35,7 @@ const en = {
     limit2: 'Do not enter personal data such as NIK, NPWP, or full names.',
     limit3: 'The knowledge base is still growing. The Regulation library lists the regulations Taxora can cite.',
   },
+  groups: { new: 'New group', nameLabel: 'Group name', namePlaceholder: 'e.g. Client A', actions: 'Actions for group {{name}}', rename: 'Rename group', delete: 'Delete group', moveTo: 'MOVE TO GROUP', removeFromGroup: 'Remove from group', ungrouped: 'NOT IN A GROUP', empty: 'Drag a conversation here, or use its menu.', duplicate: 'You already have a group with that name.', confirmTitle: 'Delete group?', confirmText: 'The group “{{name}}” will be deleted. Its {{count}} conversation(s) stay in your history, outside any group.' },
   history: { actions: 'Actions for {{title}}', rename: 'Rename', renameLabel: 'Conversation name', delete: 'Delete', cancel: 'Cancel', confirmTitle: 'Delete conversation?', confirmText: '“{{title}}” and all its messages will be deleted. This cannot be undone.' },
   account: { menu: 'Account', unnamed: 'Account', roles: { user: 'User', reviewer: 'Reviewer', admin: 'Admin' } },
   regulations: { eyebrow: 'KNOWLEDGE BASE', title: 'Regulation library', intro: 'Browse published regulations available to the assistant. Each entry links to its original source.', emptyTitle: 'No published regulations found', emptyDescription: 'Only approved, published documents appear here. Connect to the backend and check again later.' },
@@ -41,11 +43,11 @@ const en = {
     eyebrow: 'ADMINISTRATION', title: 'Knowledge admin', intro: 'Add official regulations to the knowledge base. Every document is reviewed against its source before the assistant can use it.', reviewerIntro: 'Check extracted documents against their official source, then approve them for publication.',
     submitted: 'Document queued for processing.', formTitle: 'Add a regulation', formDescription: 'Metadata is entered by you, never guessed by AI. The document stays hidden from users until it is approved and published.',
     sourceMode: 'Document source', modeUrl: 'Official link', modeUpload: 'Upload PDF', file: 'PDF file', fileHint: 'Text-based PDF, max 30 MB. Scanned documents are not supported yet.',
-    sourceUrl: 'Official source URL', sourceUrlHint: 'Direct PDF download link from peraturan.bpk.go.id, jdih.kemenkeu.go.id or pajak.go.id (not the detail page).', sourceUrlUploadHint: 'The official link shown to users as the citation source.',
+    sourceUrl: 'Official source URL', sourceUrlOptional: 'Official source URL (optional)', sourceUrlHint: 'Direct PDF download link from peraturan.bpk.go.id, jdih.kemenkeu.go.id or pajak.go.id (not the detail page).', sourceUrlUploadHint: 'Optional. When given, users see it as the citation link; without it, sources show no link.',
     regulationNumber: 'Regulation number', regulationNumberPlaceholder: 'e.g. 28 TAHUN 2026', regulationType: 'Regulation type', titleField: 'Title', titlePlaceholder: 'Full regulation title', issuer: 'Issuing authority', topic: 'Topic', other: 'Other',
     issuedAt: 'Issued on', effectiveFrom: 'Effective from', effectiveUntil: 'Effective until', datesHint: 'Optional now; the reviewer can still fill in the dates. Without an effective date the document applies to every tax period.',
     submit: 'Submit for processing', submitting: 'Submitting…', recentJobs: 'Ingestion jobs', autoRefresh: 'Updating automatically', noJobs: 'No ingestion jobs yet.', noDetails: 'No additional details',
-    statuses: { queued: 'Queued', processing: 'Processing', review_required: 'Review required', approved: 'Approved', published: 'Published', failed: 'Failed' },
+    statuses: { queued: 'Queued', processing: 'Processing', review_required: 'Review required', approved: 'Approved', published: 'Published', failed: 'Failed', rejected: 'Rejected' },
     review: {
       title: 'Document review', result: 'Result', error: 'Error', verifiedAt: 'Approved on', downloadOriginal: 'Download stored original',
       dates: 'Regulation dates', saveDates: 'Save dates', datesSaved: 'Dates saved.', datesFrozen: 'Dates are locked after approval. An admin can fix them with Correct metadata.',
@@ -54,7 +56,10 @@ const en = {
       noEffectiveDate: 'No effective date set: the document will be used for every tax period.', confirm: 'I compared the extracted text and metadata with the official source.',
       approve: 'Approve', approved: 'Document approved. An admin can now publish it.', saveFirst: 'Save or undo the date changes first.',
       publish: 'Publish', published: 'Document published. The assistant can now cite it.', waitingForAdmin: 'Approved. Waiting for an admin to publish.',
-      retry: 'Retry', retried: 'Job queued again.', isPublished: 'Published and available to the assistant and the regulation library.',
+      retry: 'Retry', retried: 'Job queued again.',
+      reject: 'Reject', rejectTitle: 'Reject this document?', rejectText: '{{name}} will not be used by the assistant. An admin can delete it and submit a corrected document.', rejectReason: 'Reason', rejectPlaceholder: 'e.g. Article 2 is cut off on page 3', rejected: 'Document rejected.', rejectedBecause: 'Rejected because', isRejected: 'Rejected: not used by the assistant. Delete it and submit a corrected document.',
+      delete: 'Delete document', deleteTitle: 'Delete this document?', deleteText: '{{name}}, its extracted articles, and its stored PDF will be deleted. This cannot be undone.', deletePublishedText: '{{name}} is published: the assistant will stop citing it immediately. Its extracted articles and stored PDF will be deleted. This cannot be undone.', deleted: '{{name}} deleted.',
+      noSourceUrl: 'No official link (uploaded)', isPublished: 'Published and available to the assistant and the regulation library.',
     },
     correction: {
       title: 'Correct metadata', open: 'Correct metadata', intro: 'Fix wrong dates, title, issuer or topic. The legal text and the regulation number stay as reviewed; re-submit the document if those are wrong.',
@@ -72,9 +77,10 @@ type TranslationShape<T> = {
 
 const id: TranslationShape<typeof en> = {
   language: { select: 'Pilih bahasa', english: 'English', indonesian: 'Bahasa Indonesia' },
+  theme: { useDark: 'Ganti ke tema gelap', useLight: 'Ganti ke tema terang' },
   common: { documentTitle: 'Taxora — Pajak lebih mudah dipahami', close: 'Tutup', workspace: 'Ruang kerja', help: 'Bantuan', loading: 'Memuat…', published: 'Dipublikasikan', originalSource: 'Sumber asli', refresh: 'Muat ulang' },
   navigation: {
-    resizeSidebar: 'Ubah lebar sidebar', resizeSidebarHint: 'Tarik untuk mengubah lebar, klik dua kali untuk mengembalikan', closeNavigation: 'Tutup navigasi', openNavigation: 'Buka navigasi', toggleSidebar: 'Tampilkan/sembunyikan sidebar', newConversation: 'Konsultasi baru', workspace: 'RUANG KERJA', taxAssistant: 'Asisten pajak', regulationLibrary: 'Pustaka peraturan', knowledgeAdmin: 'Admin knowledge base', recent: 'TERBARU', searchConversations: 'Cari percakapan', emptyHistory: 'Percakapan Anda akan muncul di sini.', evidenceFirst: 'Jawaban berbasis bukti', sourcesToVerify: 'Sumber yang dapat diverifikasi.', signOut: 'Keluar', signedIn: 'Sudah masuk',
+    resizeSidebar: 'Ubah lebar sidebar', resizeSidebarHint: 'Tarik untuk mengubah lebar, klik dua kali untuk mengembalikan', closeNavigation: 'Tutup navigasi', openNavigation: 'Buka navigasi', toggleSidebar: 'Tampilkan/sembunyikan sidebar', newConversation: 'Konsultasi Baru', workspace: 'RUANG KERJA', taxAssistant: 'Asisten Pajak', regulationLibrary: 'Pustaka Peraturan', knowledgeAdmin: 'Admin Knowledge Base', recent: 'TERBARU', searchConversations: 'Cari percakapan', emptyHistory: 'Percakapan Anda akan muncul di sini.', evidenceFirst: 'Jawaban berbasis bukti', sourcesToVerify: 'Sumber yang dapat diverifikasi.', signOut: 'Keluar', signedIn: 'Sudah masuk',
   },
   chat: {
     eyebrow: 'ASISTEN PAJAK INDONESIA ANDA', title: 'Pajak, lebih mudah dipahami.', subtitle: 'Panduan berbasis peraturan pajak Indonesia, dilengkapi sumber yang dapat Anda verifikasi.', evidenceGrounded: 'Berbasis bukti', sourceCited: 'Dengan sitasi sumber', periodAware: 'Memperhatikan periode', promptHeading: 'MULAI DENGAN PERTANYAAN', promptHint: 'Pilih pertanyaan atau tulis sendiri', disclaimer: 'Jawaban berdasarkan sumber yang tersedia dan bukan pengganti konsultasi profesional perpajakan.',
@@ -106,6 +112,7 @@ const id: TranslationShape<typeof en> = {
     limit2: 'Jangan menulis data pribadi seperti NIK, NPWP, atau nama lengkap.',
     limit3: 'Knowledge base masih terus bertambah. Pustaka peraturan berisi peraturan yang dapat dikutip Taxora.',
   },
+  groups: { new: 'Grup baru', nameLabel: 'Nama grup', namePlaceholder: 'mis. Klien A', actions: 'Tindakan untuk grup {{name}}', rename: 'Ganti nama grup', delete: 'Hapus grup', moveTo: 'PINDAHKAN KE GRUP', removeFromGroup: 'Keluarkan dari grup', ungrouped: 'TANPA GRUP', empty: 'Seret percakapan ke sini, atau gunakan menunya.', duplicate: 'Anda sudah punya grup dengan nama itu.', confirmTitle: 'Hapus grup?', confirmText: 'Grup “{{name}}” akan dihapus. {{count}} percakapan di dalamnya tetap ada di riwayat, tanpa grup.' },
   history: { actions: 'Tindakan untuk {{title}}', rename: 'Ganti nama', renameLabel: 'Nama percakapan', delete: 'Hapus', cancel: 'Batal', confirmTitle: 'Hapus percakapan?', confirmText: '“{{title}}” beserta semua pesannya akan dihapus. Tindakan ini tidak dapat dibatalkan.' },
   account: { menu: 'Akun', unnamed: 'Akun', roles: { user: 'Pengguna', reviewer: 'Reviewer', admin: 'Admin' } },
   regulations: { eyebrow: 'KNOWLEDGE BASE', title: 'Pustaka peraturan', intro: 'Jelajahi peraturan yang telah dipublikasikan dan tersedia bagi asisten. Setiap entri terhubung ke sumber aslinya.', emptyTitle: 'Tidak ada peraturan yang dipublikasikan', emptyDescription: 'Hanya dokumen yang disetujui dan dipublikasikan yang ditampilkan. Hubungkan ke backend dan coba lagi nanti.' },
@@ -113,11 +120,11 @@ const id: TranslationShape<typeof en> = {
     eyebrow: 'ADMINISTRASI', title: 'Admin knowledge base', intro: 'Tambahkan peraturan resmi ke knowledge base. Setiap dokumen ditinjau terhadap sumbernya sebelum dapat digunakan asisten.', reviewerIntro: 'Periksa dokumen hasil ekstraksi terhadap sumber resminya, lalu setujui untuk dipublikasikan.',
     submitted: 'Dokumen masuk antrean pemrosesan.', formTitle: 'Tambah peraturan', formDescription: 'Metadata diisi oleh Anda, tidak pernah ditebak AI. Dokumen tersembunyi dari pengguna sampai disetujui dan dipublikasikan.',
     sourceMode: 'Sumber dokumen', modeUrl: 'Tautan resmi', modeUpload: 'Unggah PDF', file: 'File PDF', fileHint: 'PDF berbasis teks, maks. 30 MB. Dokumen hasil scan belum didukung.',
-    sourceUrl: 'URL sumber resmi', sourceUrlHint: 'Tautan unduhan PDF langsung dari peraturan.bpk.go.id, jdih.kemenkeu.go.id, atau pajak.go.id (bukan halaman detail).', sourceUrlUploadHint: 'Tautan resmi yang ditampilkan ke pengguna sebagai sumber kutipan.',
+    sourceUrl: 'URL sumber resmi', sourceUrlOptional: 'URL sumber resmi (opsional)', sourceUrlHint: 'Tautan unduhan PDF langsung dari peraturan.bpk.go.id, jdih.kemenkeu.go.id, atau pajak.go.id (bukan halaman detail).', sourceUrlUploadHint: 'Opsional. Jika diisi, pengguna melihatnya sebagai tautan sumber kutipan; jika kosong, sumber tampil tanpa tautan.',
     regulationNumber: 'Nomor peraturan', regulationNumberPlaceholder: 'mis. 28 TAHUN 2026', regulationType: 'Jenis peraturan', titleField: 'Judul', titlePlaceholder: 'Judul lengkap peraturan', issuer: 'Instansi penerbit', topic: 'Topik', other: 'Lainnya',
     issuedAt: 'Tanggal ditetapkan', effectiveFrom: 'Berlaku mulai', effectiveUntil: 'Berlaku sampai', datesHint: 'Opsional sekarang; reviewer masih bisa mengisinya. Tanpa tanggal berlaku, dokumen dipakai untuk semua periode pajak.',
     submit: 'Kirim untuk diproses', submitting: 'Mengirim…', recentJobs: 'Job ingestion', autoRefresh: 'Diperbarui otomatis', noJobs: 'Belum ada job ingestion.', noDetails: 'Tidak ada detail tambahan',
-    statuses: { queued: 'Dalam antrean', processing: 'Diproses', review_required: 'Perlu ditinjau', approved: 'Disetujui', published: 'Dipublikasikan', failed: 'Gagal' },
+    statuses: { queued: 'Dalam antrean', processing: 'Diproses', review_required: 'Perlu ditinjau', approved: 'Disetujui', published: 'Dipublikasikan', failed: 'Gagal', rejected: 'Ditolak' },
     review: {
       title: 'Tinjauan dokumen', result: 'Hasil', error: 'Kesalahan', verifiedAt: 'Disetujui pada', downloadOriginal: 'Unduh dokumen asli yang tersimpan',
       dates: 'Tanggal peraturan', saveDates: 'Simpan tanggal', datesSaved: 'Tanggal disimpan.', datesFrozen: 'Tanggal terkunci setelah disetujui. Admin dapat memperbaikinya lewat Koreksi metadata.',
@@ -126,7 +133,10 @@ const id: TranslationShape<typeof en> = {
       noEffectiveDate: 'Tanggal berlaku belum diisi: dokumen akan dipakai untuk semua periode pajak.', confirm: 'Saya sudah membandingkan teks hasil ekstraksi dan metadata dengan sumber resmi.',
       approve: 'Setujui', approved: 'Dokumen disetujui. Admin sekarang bisa mempublikasikannya.', saveFirst: 'Simpan atau batalkan perubahan tanggal dulu.',
       publish: 'Publikasikan', published: 'Dokumen dipublikasikan. Asisten sekarang bisa mengutipnya.', waitingForAdmin: 'Disetujui. Menunggu admin mempublikasikan.',
-      retry: 'Ulangi', retried: 'Job dimasukkan ke antrean lagi.', isPublished: 'Dipublikasikan dan tersedia untuk asisten serta pustaka peraturan.',
+      retry: 'Ulangi', retried: 'Job dimasukkan ke antrean lagi.',
+      reject: 'Tolak', rejectTitle: 'Tolak dokumen ini?', rejectText: '{{name}} tidak akan dipakai asisten. Admin dapat menghapusnya lalu mengirim dokumen yang sudah diperbaiki.', rejectReason: 'Alasan', rejectPlaceholder: 'mis. Pasal 2 terpotong di halaman 3', rejected: 'Dokumen ditolak.', rejectedBecause: 'Ditolak karena', isRejected: 'Ditolak: tidak dipakai asisten. Hapus lalu kirim dokumen yang sudah diperbaiki.',
+      delete: 'Hapus dokumen', deleteTitle: 'Hapus dokumen ini?', deleteText: '{{name}}, pasal-pasal hasil ekstraksinya, dan PDF yang tersimpan akan dihapus. Tindakan ini tidak dapat dibatalkan.', deletePublishedText: '{{name}} sudah dipublikasikan: asisten langsung berhenti mengutipnya. Pasal-pasal hasil ekstraksi dan PDF yang tersimpan akan dihapus. Tindakan ini tidak dapat dibatalkan.', deleted: '{{name}} dihapus.',
+      noSourceUrl: 'Tanpa tautan resmi (diunggah)', isPublished: 'Dipublikasikan dan tersedia untuk asisten serta pustaka peraturan.',
     },
     correction: {
       title: 'Koreksi metadata', open: 'Koreksi metadata', intro: 'Perbaiki tanggal, judul, instansi, atau topik yang keliru. Teks pasal dan nomor peraturan tetap seperti yang sudah ditinjau; kirim ulang dokumen jika keduanya salah.',

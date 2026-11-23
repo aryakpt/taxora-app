@@ -33,3 +33,8 @@ def save(content: bytes) -> str:
 
 def load(key: str) -> bytes:
     return _path(key).read_bytes()
+
+
+def delete(key: str) -> None:
+    """Remove a stored original. Callers check first that no job or version still refers to it."""
+    _path(key).unlink(missing_ok=True)

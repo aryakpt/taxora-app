@@ -13,6 +13,6 @@ export function RegulationCard({ regulation }: Props) {
       <h2>{regulation.title}</h2>
       <span className="published-tag"><Check size={12} /> {t('common.published')}</span>
     </div>
-    <a className="outline-link" href={regulation.source_url} target="_blank" rel="noreferrer">{t('common.originalSource')} <ArrowUpRight size={14} /></a>
+    {regulation.source_url && <a className="outline-link" href={regulation.source_url} target="_blank" rel="noreferrer">{t('common.originalSource')} <ArrowUpRight size={14} /></a>}
   </article>
 }

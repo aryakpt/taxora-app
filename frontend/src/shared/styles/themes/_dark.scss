@@ -1,0 +1,52 @@
+// Dark theme. Most of it is generated at build time from the light colors (frontend/theme/darkTheme.ts);
+// this file only holds what the generator cannot know. Rules here mention data-theme, so they are not regenerated,
+// and they load last, so they win over the generated rules of the same specificity.
+
+$dark-canvas: #092328;
+$dark-action: #2b7a63; // filled buttons: brand green, lifted just enough to stand out on the dark page
+$dark-action-hover: #33896f;
+
+:root[data-theme='dark'] {
+  color-scheme: dark; // native scrollbars, date pickers, and selects
+}
+
+[data-theme='dark'] {
+  // Filled buttons keep white text on brand green; inverted they would read as pale, disabled buttons.
+  .new-chat,
+  .send-button,
+  .primary-button,
+  .auth-submit,
+  .confirm-dialog-confirm:not(.danger) {
+    background: $dark-action;
+    color: #fff;
+  }
+
+  .new-chat:hover,
+  .send-button:hover:not(:disabled),
+  .primary-button:hover,
+  .auth-submit:hover:not(:disabled),
+  .confirm-dialog-confirm:not(.danger):hover:not(:disabled) {
+    background: $dark-action-hover;
+  }
+
+  .send-button:disabled,
+  .auth-submit:disabled {
+    background: #1d4a3f;
+    color: #8fb3a8;
+  }
+
+  .confirm-dialog-confirm.danger { background: #b4574e; color: #fff; }
+  .confirm-dialog-confirm.danger:hover:not(:disabled) { background: #c4655b; }
+
+  // The brand mark keeps its navy with a white leaf, lifted to stay visible on the dark sidebar.
+  .brand-mark { background: #2f5d86; }
+  .brand-mark span { border-color: #fff; }
+
+  // Your own messages: a deep brand-green bubble rather than the olive the generic mapping gives.
+  .message-row.user .user-content { background: #15423a; border-color: #1f5449; color: #e3eeea; }
+
+  .send-spinner { border-color: #ffffff66; border-top-color: #fff; }
+
+  // The login page's soft spotlight: a lighter center reads as a glow on dark, so keep it subtle.
+  .auth-screen { background: radial-gradient(ellipse at 50% 42%, #0e2d32 0, $dark-canvas 45%, $dark-canvas 75%); }
+}

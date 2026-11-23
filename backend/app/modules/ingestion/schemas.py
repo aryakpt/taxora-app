@@ -11,7 +11,8 @@ from app.modules.ingestion.sources import check_url
 class RegulationMetadata(BaseModel):
     """Metadata an admin supplies for a regulation document (PRD §6.1-6.2). Never inferred by AI."""
 
-    source_url: HttpUrl = Field(description="Official source link, cited to users. Must be on the allowlist.")
+    source_url: HttpUrl | None = Field(
+        default=None, description="Official source link, cited to users. Must be on the allowlist. Optional for uploads.")
     regulation_number: str = Field(min_length=1, max_length=100, examples=["28 TAHUN 2026"])
     regulation_type: str = Field(min_length=1, max_length=30, examples=["PMK"])
     title: str = Field(min_length=1, max_length=1000)
@@ -23,10 +24,16 @@ class RegulationMetadata(BaseModel):
     is_internal: bool = False
     allowed_user_ids: list[UUID] = []
 
+    @field_validator("source_url", mode="before")
+    @classmethod
+    def empty_is_none(cls, value):
+        return None if isinstance(value, str) and not value.strip() else value
+
     @field_validator("source_url")
     @classmethod
-    def official_source(cls, value: HttpUrl) -> HttpUrl:
-        check_url(str(value))
+    def official_source(cls, value: HttpUrl | None) -> HttpUrl | None:
+        if value is not None:
+            check_url(str(value))
         return value
 
     @model_validator(mode="after")
@@ -45,6 +52,16 @@ class RegulationMetadata(BaseModel):
             "is_internal": self.is_internal,
             "allowed_user_ids": [str(user_id) for user_id in self.allowed_user_ids],
         }
+
+
+class UrlSubmission(RegulationMetadata):
+    """Submission by link: the PDF is downloaded from it, so the link is required."""
+
+    source_url: HttpUrl = Field(description="Official PDF download link. Must be on the allowlist.")
+
+
+class Rejection(BaseModel):
+    reason: str = Field(min_length=5, max_length=500, description="What is wrong; shown to admins and kept in the audit log.")
 
 
 class VersionDates(BaseModel):

@@ -13,6 +13,7 @@ from app.modules.chat.citations import GenerationResult, MalformedOutput, parse_
 from app.modules.chat.schemas import AnswerStatus, ChatRequest, ChatResponse, Claim, Source
 from app.modules.conversations.models import Conversation, Message
 from app.modules.generation import providers
+from app.modules.generation.embeddings import EmbeddingError
 from app.modules.generation.llm import LLMClient, LLMError, QuotaExhausted
 from app.modules.generation.prompts import PROMPT_VERSION, Turn, system_prompt, user_prompt
 from app.modules.query_understanding.language import detect_language
@@ -145,6 +146,15 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
     embedder = providers.get_embedder()
     # A follow-up ("bagaimana syaratnya?") is judged and searched together with the previous question.
     search_text = f"{history[-1].question}\n{body.question}" if history else body.question
+    try:
+        return await _decide_with_embeddings(body, session, user, request_id, history, search_text, embedder, copy)
+    except EmbeddingError as exc:
+        logger.warning("embedding failed request_id=%s error=%s", request_id, exc)
+        return Outcome(AnswerStatus.failed, copy["llm_unavailable"], trace={"embedding_error": str(exc)[:200]})
+
+
+async def _decide_with_embeddings(body: ChatRequest, session: AsyncSession, user: User, request_id: uuid.UUID,
+                                  history: list[Turn], search_text: str, embedder, copy: dict) -> Outcome:
     scope = await assess_scope(search_text, embedder)
     trace = {"scope": {"in_scope": scope.in_scope, "reason": scope.reason, "similarity": scope.similarity},
              "history_turns": len(history)}

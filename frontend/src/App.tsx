@@ -50,6 +50,18 @@ export default function App() {
     }
   }
 
+  // Sidebar actions report success, so an inline editor stays open (with the error shown) when saving fails.
+  async function attempt(action: () => Promise<unknown>, messages: {[status: number]: string} = {}) {
+    try {
+      await action();
+      return true;
+    } catch (actionError) {
+      const status = (actionError as {status?: number}).status;
+      setError((status && messages[status]) || (actionError as Error).message);
+      return false;
+    }
+  }
+
   async function deleteConversation(id: string) {
     try {
       await history.remove(id);
@@ -99,6 +111,11 @@ export default function App() {
         onOpenConversation={selectConversation}
         onRenameConversation={renameConversation}
         onDeleteConversation={deleteConversation}
+        groups={history.groups}
+        onMoveConversation={(id, groupId) => attempt(() => history.move(id, groupId))}
+        onCreateGroup={(name) => attempt(() => history.createGroup(name), {409: t('groups.duplicate')})}
+        onRenameGroup={(id, name) => attempt(() => history.renameGroup(id, name), {409: t('groups.duplicate')})}
+        onDeleteGroup={(id) => attempt(() => history.removeGroup(id))}
         onSignOut={() => void signOut()}
         width={sidebar.width}
         onResize={sidebar.resize}

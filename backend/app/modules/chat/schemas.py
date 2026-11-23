@@ -36,7 +36,7 @@ class Source(BaseModel):
     title: str
     article: str | None
     quote: str
-    source_url: str
+    source_url: str | None  # None when the document was uploaded without an official link
     verification_status: str
     effective_from: date | None
     effective_until: date | None

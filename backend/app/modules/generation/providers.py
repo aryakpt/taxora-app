@@ -4,13 +4,21 @@ access) so tests can replace these functions with fakes."""
 from functools import lru_cache
 
 from app.core.config import settings
-from app.modules.generation.embeddings import Embedder, LocalEmbedder
+from app.modules.generation.embeddings import ApiEmbedder, Embedder
 from app.modules.generation.llm import LLMClient, OpenAICompatibleLLM
 
 
 @lru_cache(maxsize=1)
-def get_embedder() -> Embedder:
-    return LocalEmbedder(settings.embedding_model)
+def _configured_embedder() -> Embedder:
+    return ApiEmbedder(
+        settings.embedding_api_key or settings.llm_api_key, settings.embedding_base_url, settings.embedding_model,
+        settings.embedding_dimensions, tokens_per_minute=settings.embedding_tokens_per_minute,
+    )
+
+
+def get_embedder() -> Embedder | None:
+    """None without an API key: the scope guard then relies on tax terms only and search on keywords only."""
+    return _configured_embedder() if (settings.embedding_api_key or settings.llm_api_key) else None
 
 
 @lru_cache(maxsize=1)

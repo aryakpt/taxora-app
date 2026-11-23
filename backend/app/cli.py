@@ -3,6 +3,7 @@
     .venv/bin/python -m app.cli set-role <email> <role>
     .venv/bin/python -m app.cli seed-dev-users
     .venv/bin/python -m app.cli reprocess <job_id>
+    .venv/bin/python -m app.cli reindex
     .venv/bin/python -m app.cli ask-raw "<question>"
     .venv/bin/python -m app.cli eval-retrieval [--include-unreviewed]
 """
@@ -18,6 +19,7 @@ from app.core.database import SessionLocal, engine
 from app.core.security import hash_password
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import User, UserRole
+from app.modules.generation.embeddings import EmbeddingError
 
 RAW_SYSTEM_PROMPT = (
     "You are a general assistant. Answer the user's question in the language it is asked in. "
@@ -117,6 +119,18 @@ async def reprocess(job_id: str) -> str:
         raise CommandError(str(exc)) from exc
 
 
+async def reindex() -> int:
+    from app.modules.ingestion import service
+
+    def progress(done: int, total: int) -> None:
+        print(f"  {done}/{total} chunks embedded", flush=True)
+
+    try:
+        return await service.reindex(progress=progress)
+    except EmbeddingError as exc:
+        raise CommandError(f"{exc} Run `make reindex` again to continue.") from exc
+
+
 async def eval_retrieval(include_unreviewed: bool) -> list[dict]:
     """Every dataset in app/modules/evaluation/cases/."""
     from app.modules.evaluation import retrieval
@@ -152,6 +166,7 @@ def main(argv: list[str] | None = None) -> int:
     commands.add_parser("seed-dev-users", help="create one development account per role (not in production)")
     reprocess_parser = commands.add_parser("reprocess", help="re-extract a document that is still under review")
     reprocess_parser.add_argument("job_id")
+    commands.add_parser("reindex", help="embed every chunk without a vector (after changing the embedding model)")
     ask_parser = commands.add_parser("ask-raw", help="ask the LLM directly, without Taxora's sources or guards")
     ask_parser.add_argument("question")
     eval_parser = commands.add_parser("eval-retrieval", help="score the scope guard and retrieval on the dataset")
@@ -165,6 +180,8 @@ def main(argv: list[str] | None = None) -> int:
                 return await set_role(args.email, UserRole(args.role))
             if args.command == "reprocess":
                 return await reprocess(args.job_id)
+            if args.command == "reindex":
+                return await reindex()
             if args.command == "ask-raw":
                 return await ask_raw(args.question)
             if args.command == "eval-retrieval":
@@ -178,11 +195,16 @@ def main(argv: list[str] | None = None) -> int:
     except CommandError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
+    except EmbeddingError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
 
     if args.command == "set-role":
         print(f"{args.email}: {result} -> {args.role}. It applies to the next request; the user may need to reload the page.")
     elif args.command == "reprocess":
         print(result)
+    elif args.command == "reindex":
+        print(f"done: {result} chunks embedded")
     elif args.command == "ask-raw":
         model, answer = result
         print(f"[{model}] — no sources, no checks\n\n{answer}")

@@ -21,13 +21,21 @@ export function KnowledgeAdminPage({ request }: Props) {
   const [notice, setNotice] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const showError = useCallback((message: string) => { setNotice(''); setError(message) }, [])
-  const { jobs, loading, processing, refresh, replace } = useIngestionJobs(api, showError)
+  const { jobs, loading, processing, refresh, replace, removeJob } = useIngestionJobs(api, showError)
   const selected = jobs.find(job => job.id === selectedId) ?? null
 
   function changed(job: IngestionJob, message: string) {
     replace(job)
     setError('')
     setNotice(message)
+  }
+
+  function deleted(jobId: string, message: string) {
+    removeJob(jobId)
+    setSelectedId(null)
+    setError('')
+    setNotice(message)
+    void refresh()  // duplicate jobs of the same document were deleted too
   }
 
   async function submit(metadata: RegulationMetadata, file: File | null) {
@@ -50,6 +58,6 @@ export function KnowledgeAdminPage({ request }: Props) {
     {error && <div className="error-banner" role="alert">{error}<button onClick={() => setError('')} aria-label={t('common.close')}><X size={14} /></button></div>}
     {isAdmin && <IngestionForm onSubmit={submit} />}
     <IngestionJobList jobs={jobs} loading={loading} processing={processing} selectedId={selectedId} onSelect={setSelectedId} onRefresh={() => void refresh()} />
-    {selected && <JobReviewPanel key={selected.id} job={selected} api={api} isAdmin={isAdmin} onChanged={changed} onError={showError} onClose={() => setSelectedId(null)} />}
+    {selected && <JobReviewPanel key={selected.id} job={selected} api={api} isAdmin={isAdmin} onChanged={changed} onDeleted={deleted} onError={showError} onClose={() => setSelectedId(null)} />}
   </section>
 }

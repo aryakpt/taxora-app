@@ -261,6 +261,37 @@ async def test_answers_stored_before_sources_were_kept_still_open(client, fake_a
     assert answer["sources"] == [] and answer["limitations"] == [] and answer["latency_ms"] == 900
 
 
+async def test_an_embedding_outage_fails_the_answer_without_a_500(client, fake_ai, monkeypatch):
+    from app.modules.generation.embeddings import EmbeddingError
+
+    async def broken(text_value):
+        raise EmbeddingError("Layanan embedding gagal (APIConnectionError).")
+
+    monkeypatch.setattr(fake_ai.embedder, "embed", broken)
+    await sign_in(client)
+
+    body = await ask(client, "gaji saya dipotong berapa oleh negara?")  # no tax term: needs the embedder
+
+    assert body["answer_status"] == "failed"
+    assert (await stored_answer()).metadata_json["embedding_error"].startswith("Layanan embedding gagal")
+
+
+async def test_without_an_embedding_service_tax_terms_still_pass_and_keywords_still_search(client, fake_ai,
+                                                                                         monkeypatch):
+    from app.modules.generation import providers
+
+    chunk_id = await seed_fixture_regulation()
+    fake_ai.enable_llm(llm_answer(chunk_id))
+    monkeypatch.setattr(providers, "get_embedder", lambda: None)
+    await sign_in(client)
+
+    answered = await ask(client, "Berapa tarif pajak atas sewa?")
+    refused = await ask(client, "gaji saya dipotong berapa oleh negara?")
+
+    assert answered["answer_status"] == "answered"  # found through the keyword channel
+    assert refused["answer_status"] == "out_of_scope"
+
+
 async def test_the_answer_id_is_returned_for_feedback(client, fake_ai):
     chunk_id = await seed_fixture_regulation()
     fake_ai.enable_llm(llm_answer(chunk_id))

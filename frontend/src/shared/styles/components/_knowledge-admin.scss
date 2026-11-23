@@ -300,3 +300,12 @@
   .review-facts { grid-template-columns: 1fr; gap: 2px; }
   .review-facts dd { margin-bottom: 6px; }
 }
+
+
+.job-status.rejected { background: #fbefee; color: #9b514a !important; }
+
+.secondary-button.danger { color: #9b514a; border-color: #ecd3cf; }
+.secondary-button.danger:hover:not(:disabled) { background: #fbefee; }
+
+.text-button.danger { display: inline-flex; align-items: center; gap: 5px; color: #9b514a; }
+.review-delete { margin-left: auto; }

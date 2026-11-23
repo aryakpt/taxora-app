@@ -8,7 +8,7 @@ from app.core.database import SessionDep
 from app.modules.auth.dependencies import AdminUser, ReviewerUser
 from app.modules.ingestion import service, storage
 from app.modules.ingestion.models import IngestionJob
-from app.modules.ingestion.schemas import MetadataCorrection, RegulationMetadata, UploadForm, VersionDates
+from app.modules.ingestion.schemas import MetadataCorrection, Rejection, UploadForm, UrlSubmission, VersionDates
 
 router = APIRouter(prefix="/api/v1/admin/ingestion", tags=["admin"])
 
@@ -21,7 +21,7 @@ async def _job_or_404(session, job_id: uuid.UUID) -> IngestionJob:
 
 
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
-async def create_from_url(body: RegulationMetadata, background: BackgroundTasks, session: SessionDep,
+async def create_from_url(body: UrlSubmission, background: BackgroundTasks, session: SessionDep,
                           user: AdminUser):
     """Queue a document from an official PDF link. Processing continues after this response."""
     job = await service.create_job(session, user, body)
@@ -36,7 +36,7 @@ async def create_from_upload(
     session: SessionDep,
     user: AdminUser,
 ):
-    """Queue an uploaded PDF. `source_url` is still required: it is the official link shown to users."""
+    """Queue an uploaded PDF. `source_url` is optional: when given, it is the official link shown to users."""
     content = await form.file.read(settings.max_upload_bytes + 1)
     if len(content) > settings.max_upload_bytes:
         raise HTTPException(413, "Dokumen melebihi batas ukuran")
@@ -118,6 +118,23 @@ async def update_dates(job_id: uuid.UUID, body: VersionDates, session: SessionDe
 async def correct_metadata(job_id: uuid.UUID, body: MetadataCorrection, session: SessionDep, user: AdminUser):
     """Correct the metadata of an approved or published document (dates, title, issuer, topic), with a reason."""
     return await _transition(lambda s, j, u: service.correct_metadata(s, j, u, body), session, job_id, user)
+
+
+@router.post("/{job_id}/reject")
+async def reject(job_id: uuid.UUID, body: Rejection, session: SessionDep, user: ReviewerUser):
+    """Turn down a document under review, with the reason."""
+    return await _transition(lambda s, j, u: service.reject(s, j, u, body), session, job_id, user)
+
+
+@router.delete("/{job_id}")
+async def delete_document(job_id: uuid.UUID, session: SessionDep, user: AdminUser):
+    """Delete the document (any status except while processing): version, provisions, chunks, stored PDF."""
+    try:
+        return {"deleted": True, **await service.delete_document(session, job_id, user)}
+    except service.JobNotFound as exc:
+        raise HTTPException(404, "Job tidak ditemukan") from exc
+    except service.InvalidTransition as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 @router.post("/{job_id}/retry", status_code=status.HTTP_202_ACCEPTED)

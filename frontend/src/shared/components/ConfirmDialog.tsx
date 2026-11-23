@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { createPortal } from 'react-dom'
 
@@ -9,13 +9,15 @@ interface Props {
   cancelLabel: string
   busy?: boolean
   danger?: boolean
+  confirmDisabled?: boolean
+  children?: ReactNode  // extra content between the message and the buttons, e.g. a reason field
   onConfirm: () => void
   onCancel: () => void
 }
 
 /** A centred, modal confirmation. Cancel has focus first, so Enter never confirms by accident;
  * Escape or a click on the backdrop cancels; Tab stays inside the dialog. */
-export function ConfirmDialog({ title, message, confirmLabel, cancelLabel, busy = false, danger = false, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({ title, message, confirmLabel, cancelLabel, busy = false, danger = false, confirmDisabled = false, children, onConfirm, onCancel }: Props) {
   const titleId = useId()
   const messageId = useId()
   const dialog = useRef<HTMLDivElement>(null)
@@ -47,9 +49,10 @@ export function ConfirmDialog({ title, message, confirmLabel, cancelLabel, busy 
         {danger && <div className="confirm-dialog-icon" aria-hidden="true"><AlertTriangle size={20} /></div>}
         <h2 id={titleId}>{title}</h2>
         <p id={messageId}>{message}</p>
+        {children}
         <div className="confirm-dialog-actions">
           <button ref={cancel} className="confirm-dialog-cancel" onClick={onCancel} disabled={busy}>{cancelLabel}</button>
-          <button className={`confirm-dialog-confirm ${danger ? 'danger' : ''}`} onClick={onConfirm} disabled={busy}>{confirmLabel}</button>
+          <button className={`confirm-dialog-confirm ${danger ? 'danger' : ''}`} onClick={onConfirm} disabled={busy || confirmDisabled}>{confirmLabel}</button>
         </div>
       </div>
     </div>,

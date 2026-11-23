@@ -50,8 +50,8 @@ export function IngestionForm({ onSubmit }: Props) {
       <small>{t('admin.fileHint')}</small>
     </label>}
 
-    <label>{t('admin.sourceUrl')}
-      <input type="url" required value={form.source_url} onChange={event => set('source_url', event.target.value)} placeholder="https://peraturan.bpk.go.id/Download/…/….pdf" />
+    <label>{mode === 'url' ? t('admin.sourceUrl') : t('admin.sourceUrlOptional')}
+      <input type="url" required={mode === 'url'} value={form.source_url} onChange={event => set('source_url', event.target.value)} placeholder="https://peraturan.bpk.go.id/Download/…/….pdf" />
       <small>{mode === 'url' ? t('admin.sourceUrlHint') : t('admin.sourceUrlUploadHint')}</small>
     </label>
 

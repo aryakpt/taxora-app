@@ -8,7 +8,7 @@ export interface Source {
   title: string
   article?: string | null
   quote: string
-  source_url: string
+  source_url: string | null
   verification_status: string
   effective_from?: string | null
   effective_until?: string | null
@@ -28,6 +28,7 @@ export interface ChatMessage {
 export interface ConversationSummary {
   id: string
   title: string
+  group_id?: string | null
   updated_at?: string
 }
 
@@ -37,15 +38,15 @@ export interface Regulation {
   type: string
   title: string
   topic: string
-  source_url: string
+  source_url: string | null
 }
 
-export type JobStatus = 'queued' | 'processing' | 'review_required' | 'approved' | 'published' | 'failed'
+export type JobStatus = 'queued' | 'processing' | 'review_required' | 'approved' | 'published' | 'failed' | 'rejected'
 
 export interface IngestionJob {
   id: string
   status: JobStatus
-  source_url: string
+  source_url: string | null
   filename: string | null
   error: string | null
   detail: string | null
@@ -53,6 +54,7 @@ export interface IngestionJob {
   updated_at: string
   storage_available: boolean
   corrections: MetadataCorrectionEntry[]
+  rejection: { at: string; by: string | null; reason: string } | null
   regulation: { id: string; type: string; number: string; title: string; issuer: string; topic: string } | null
   version: {
     id: string
@@ -90,4 +92,9 @@ export interface ChatResponse {
   missing_information?: string[]
   limitations?: string[]
   latency_ms: number
+}
+
+export interface ConversationGroup {
+  id: string
+  name: string
 }

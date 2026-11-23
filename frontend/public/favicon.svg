@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Taxora</title>
+  <rect x="4" y="4" width="56" height="56" rx="17" fill="#203b57" transform="rotate(-4 32 32)"/>
+  <path d="M36.87,17.39 H36.87 A4.87,4.87 0 0 1 41.74,22.26 V32.00 A14.61,14.61 0 0 1 27.13,46.61 H27.13 A4.87,4.87 0 0 1 22.26,41.74 V32.00 A14.61,14.61 0 0 1 36.87,17.39 Z" fill="none" stroke="#ffffff" stroke-width="4.20" stroke-linejoin="round"/>
+</svg>
