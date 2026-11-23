@@ -79,7 +79,7 @@ async def ask_raw(question: str) -> tuple[str, str]:
     import json
 
     from app.modules.generation import providers
-    from app.modules.generation.llm import LLMError
+    from app.modules.generation.llm import LLMError, QuotaExhausted
 
     llm = providers.get_llm()
     if llm is None:
@@ -89,6 +89,8 @@ async def ask_raw(question: str) -> tuple[str, str]:
         try:
             reply = await llm.complete_json(RAW_SYSTEM_PROMPT, question, attempt)
             break
+        except QuotaExhausted as exc:
+            raise CommandError(f"OpenRouter {exc}. More quota: https://openrouter.ai/settings/credits") from exc
         except LLMError as exc:
             errors.append(str(exc))
     else:

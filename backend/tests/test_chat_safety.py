@@ -257,3 +257,66 @@ async def test_the_request_names_the_model_for_the_attempt():
 
     assert sent[0]["model"] == "reliable" and sent[0]["models"] == ["reliable", "fast"]
     assert reply.model == "reliable"
+
+
+# --- quota -----------------------------------------------------------------------------------
+
+DAILY_QUOTA_429 = {"error": {
+    "message": "Rate limit exceeded: free-models-per-day. Add 10 credits to unlock 1000 free model requests per day",
+    "code": 429,
+    "metadata": {"headers": {"X-RateLimit-Limit": "50", "X-RateLimit-Remaining": "0",
+                             "X-RateLimit-Reset": "1795478400000"},
+                 "limit_source": "openrouter_free_tier_daily"}}}
+UPSTREAM_429 = {"error": {"message": "Provider returned error", "code": 429,
+                          "metadata": {"raw": "temporarily rate-limited upstream",
+                                       "limit_source": "upstream_provider_shared_pool"}}}
+
+
+def llm_with_responses(*responses):
+    import httpx
+    from openai import AsyncOpenAI
+
+    from app.modules.generation.llm import OpenAICompatibleLLM
+
+    sent = []
+
+    def handler(request):
+        sent.append(request)
+        status, body = responses[min(len(sent), len(responses)) - 1]
+        return httpx.Response(status, json=body)
+
+    llm = OpenAICompatibleLLM("key", "https://openrouter.ai/api/v1", "fast", ["reliable"])
+    llm._client = AsyncOpenAI(api_key="key", base_url="https://openrouter.ai/api/v1", max_retries=0,
+                              http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    return llm, sent
+
+
+async def test_daily_quota_is_recognised_and_not_requested_again_until_it_resets(monkeypatch):
+    from datetime import datetime, timezone
+
+    from app.modules.generation import llm as llm_module
+    from app.modules.generation.llm import QuotaExhausted
+
+    llm, sent = llm_with_responses((429, DAILY_QUOTA_429), (200, completion('{"answer": "ok"}')))
+    monkeypatch.setattr(llm_module.time, "time", lambda: 1795470000.0)  # before the reset
+
+    with pytest.raises(QuotaExhausted) as raised:
+        await llm.complete_json("s", "u")
+    assert raised.value.resets_at == datetime(2026, 11, 24, 0, 0, tzinfo=timezone.utc)  # 07.00 WIB
+    with pytest.raises(QuotaExhausted):
+        await llm.complete_json("s", "u", attempt=1)
+    assert len(sent) == 1  # the second call never reached the provider
+
+    monkeypatch.setattr(llm_module.time, "time", lambda: 1795478401.0)  # after the reset
+    assert (await llm.complete_json("s", "u")).text == '{"answer": "ok"}'
+    assert len(sent) == 2
+
+
+async def test_a_briefly_rate_limited_model_is_an_ordinary_retryable_error():
+    from app.modules.generation.llm import LLMError, QuotaExhausted
+
+    llm, _ = llm_with_responses((429, UPSTREAM_429))
+
+    with pytest.raises(LLMError) as raised:
+        await llm.complete_json("s", "u")
+    assert not isinstance(raised.value, QuotaExhausted) and "429" in str(raised.value)
