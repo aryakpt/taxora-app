@@ -15,6 +15,7 @@ from app.modules.conversations.models import Conversation, Message
 from app.modules.generation import providers
 from app.modules.generation.llm import LLMClient, LLMError, QuotaExhausted
 from app.modules.generation.prompts import PROMPT_VERSION, Turn, system_prompt, user_prompt
+from app.modules.query_understanding.language import detect_language
 from app.modules.query_understanding.period import reference_date
 from app.modules.query_understanding.scope import assess_scope
 from app.modules.retrieval.service import hybrid_search
@@ -77,6 +78,8 @@ class Outcome:
 async def answer_question(body: ChatRequest, session: AsyncSession, user: User) -> ChatResponse:
     started = time.monotonic()
     request_id = uuid.uuid4()
+    # Answer in the language the question is written in; the interface language only breaks ties.
+    body = body.model_copy(update={"response_language": detect_language(body.question, body.response_language)})
     conversation = await _conversation_for(body, session, user)
     history = await _history(session, conversation.id)
     session.add(Message(conversation_id=conversation.id, role="user", content=body.question,
