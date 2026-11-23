@@ -19,6 +19,14 @@ class LLMError(Exception):
     """The provider failed, timed out, or returned no content."""
 
 
+class Overloaded(LLMError):
+    """The provider is temporarily out of capacity (Gemini: 503 "This model is currently experiencing high
+    demand"). It affects every key, so a new key does not help; waiting a little or another model does."""
+
+
+OVERLOAD_STATUSES = {500, 502, 503, 504, 529}
+
+
 class QuotaExhausted(LLMError):
     """The account's request quota is used up (OpenRouter free tier: 50 or 1000 free-model requests a day).
     Retrying cannot help until `resets_at`."""
@@ -110,7 +118,8 @@ class OpenAICompatibleLLM:
             if quota := quota_exhaustion(exc):
                 self._quota_exhausted = quota
                 raise quota from exc
-            raise LLMError(f"{type(exc).__name__} ({exc.status_code})") from exc
+            error = Overloaded if exc.status_code in OVERLOAD_STATUSES else LLMError
+            raise error(f"{models[0]}: {type(exc).__name__} ({exc.status_code})") from exc
         except openai.OpenAIError as exc:
             raise LLMError(type(exc).__name__) from exc
         choice = completion.choices[0] if completion.choices else None

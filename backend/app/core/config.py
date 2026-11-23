@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # openrouter/free each attempt may be served by a different model. Worst case per question:
     # llm_attempts x llm_timeout_seconds, which the frontend's chat timeout must exceed.
     llm_attempts: int = 2
+    # After a provider overload (503 and similar) the next attempt waits this many seconds times the attempt
+    # number. Gemini's free tier returns 503 "high demand" in spikes that pass within seconds to minutes.
+    llm_overload_backoff_seconds: float = 2
     # OpenRouter only. Every free model is a reasoning model and reasoning cannot be switched off there;
     # "low" made replies faster (11-15 s instead of 24-40 s) and less often cut off. Empty to not send it.
     llm_reasoning_effort: Literal["low", "medium", "high", ""] = "low"

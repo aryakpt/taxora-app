@@ -3,9 +3,10 @@ import type { ChatResponse, FeedbackRating } from '../../../shared/types/tax'
 
 export type ResponseLanguage = 'en' | 'id'
 
-// The backend may try the LLM twice at up to 60 s each (LLM_ATTEMPTS x LLM_TIMEOUT_SECONDS); free models
-// often need 15-70 s. The default 30 s request timeout would give up on answers that are still coming.
-const CHAT_TIMEOUT_MS = 150_000
+// The backend tries up to LLM_ATTEMPTS models at up to LLM_TIMEOUT_SECONDS each, pausing after a busy (503)
+// reply; production allows 4 x 60 s (deploy/vercel.py), under the host's 300 s request limit. When Gemini is
+// overloaded the one model still answering can take ~45 s. A shorter timeout would drop answers still coming.
+const CHAT_TIMEOUT_MS = 290_000
 
 export function createChatApi(request: ApiRequest) {
   return {
