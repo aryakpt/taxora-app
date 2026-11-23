@@ -340,3 +340,23 @@ def test_sources_say_whether_they_cite_an_article_its_elucidation_or_an_attachme
     from app.modules.retrieval.service import provision_label
 
     assert provision_label(kind, number) == label
+
+
+@pytest.mark.parametrize(("status", "busy"), [(503, True), (500, True), (400, False), (401, False)])
+async def test_provider_overload_is_told_apart_from_other_errors(status, busy):
+    import httpx
+    from openai import AsyncOpenAI
+
+    from app.modules.generation.llm import LLMError, OpenAICompatibleLLM, Overloaded
+
+    body = {"error": {"code": status, "message": "This model is currently experiencing high demand.",
+                      "status": "UNAVAILABLE"}}
+    llm = OpenAICompatibleLLM("key", "https://generativelanguage.googleapis.com/v1beta/openai/", "gemini-x")
+    llm._client = AsyncOpenAI(api_key="key", base_url="https://example.test/v1", max_retries=0,
+                              http_client=httpx.AsyncClient(transport=httpx.MockTransport(
+                                  lambda request: httpx.Response(status, json=body))))
+
+    with pytest.raises(LLMError) as raised:
+        await llm.complete_json("s", "u")
+
+    assert isinstance(raised.value, Overloaded) is busy and "gemini-x" in str(raised.value)

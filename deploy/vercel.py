@@ -37,7 +37,11 @@ SETTINGS = {
     "MAX_UPLOAD_BYTES": str(4 * 2**20),
     "LLM_BASE_URL": "https://generativelanguage.googleapis.com/v1beta/openai/",
     "LLM_MODEL": "gemini-3.5-flash-lite",
-    "LLM_FALLBACK_MODELS": '["gemini-3.8-flash"]',
+    # Tried in turn, one per attempt. In Gemini's demand spikes (503 "high demand", measured 2026-11-23) most
+    # Flash models refuse within a second while gemini-3-flash-preview still answers, slowly (~45 s).
+    "LLM_FALLBACK_MODELS": '["gemini-3-flash-preview", "gemini-3.8-flash", "gemini-4-hydrogen"]',
+    "LLM_ATTEMPTS": "4",
+    "LLM_TIMEOUT_SECONDS": "60",
     "LLM_DATA_POLICY": "no_training",
     "EMBEDDING_MODEL": "gemini-embedding-001",
     "EMBEDDING_DIMENSIONS": "768",

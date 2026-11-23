@@ -431,3 +431,43 @@ async def test_chat_is_rate_limited_per_user(client, monkeypatch):
                 for _ in range(3)]
 
     assert statuses == [200, 200, 429]
+
+
+async def test_a_busy_provider_is_retried_after_a_pause_on_the_next_model(client, fake_ai, monkeypatch):
+    from app.modules.chat import service as chat_service
+    from app.modules.generation.llm import Overloaded
+
+    waits = []
+
+    async def fake_sleep(seconds):
+        waits.append(seconds)
+
+    monkeypatch.setattr(chat_service.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(settings, "llm_attempts", 4)
+    monkeypatch.setattr(settings, "llm_overload_backoff_seconds", 2)
+    chunk_id = await seed_fixture_regulation()
+    busy = Overloaded("gemini: InternalServerError (503)")
+    llm = fake_ai.enable_llm([busy, busy, llm_answer(chunk_id)])
+    await sign_in(client)
+
+    body = await ask(client, "Berapa tarif pajak atas sewa?")
+
+    assert body["answer_status"] == "answered"
+    assert llm.attempts == [0, 1, 2] and waits == [2, 4]  # each retry starts at the next model
+
+
+async def test_other_failures_are_retried_without_waiting(client, fake_ai, monkeypatch):
+    from app.modules.chat import service as chat_service
+
+    waits = []
+
+    async def fake_sleep(seconds):
+        waits.append(seconds)
+
+    monkeypatch.setattr(chat_service.asyncio, "sleep", fake_sleep)
+    await seed_fixture_regulation()
+    fake_ai.enable_llm(LLMError("empty completion"))
+    await sign_in(client)
+
+    assert (await ask(client, "Berapa tarif pajak atas sewa?"))["answer_status"] == "failed"
+    assert waits == []

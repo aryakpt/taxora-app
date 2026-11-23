@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 import uuid
@@ -14,7 +15,7 @@ from app.modules.chat.schemas import AnswerStatus, ChatRequest, ChatResponse, Cl
 from app.modules.conversations.models import Conversation, Message
 from app.modules.generation import providers
 from app.modules.generation.embeddings import EmbeddingError
-from app.modules.generation.llm import LLMClient, LLMError, QuotaExhausted
+from app.modules.generation.llm import LLMClient, LLMError, Overloaded, QuotaExhausted
 from app.modules.generation.prompts import PROMPT_VERSION, Turn, system_prompt, user_prompt
 from app.modules.query_understanding.language import detect_language
 from app.modules.query_understanding.period import reference_date
@@ -206,6 +207,8 @@ async def _generate(llm: LLMClient, system: str, prompt: str, evidence: list[dic
             logger.warning("llm attempt %s failed request_id=%s error=%s", attempt, request_id, exc)
             if isinstance(exc, QuotaExhausted) or attempt >= settings.llm_attempts:
                 raise  # another attempt cannot succeed before the quota resets
+            if isinstance(exc, Overloaded):  # a busy provider: give it a moment before the next model
+                await asyncio.sleep(settings.llm_overload_backoff_seconds * attempt)
     raise AssertionError("unreachable")
 
 
