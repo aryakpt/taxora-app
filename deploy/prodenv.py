@@ -30,9 +30,14 @@ def read_env_file(path: Path = ENV_FILE) -> dict[str, str]:
 
 def database_url(pooler_url: str, password: str) -> str:
     """The Supabase pooler string, with the password URL-encoded, for SQLAlchemy + asyncpg over TLS."""
-    if "[YOUR-PASSWORD]" not in pooler_url:
-        sys.exit("SUPABASE_DB_POOLER_URL must be the string from Supabase with [YOUR-PASSWORD] left in it.")
-    parts = urlsplit(pooler_url.replace("[YOUR-PASSWORD]", quote(password, safe="")))
+    # The password slot is rebuilt from SUPABASE_DB_PASSWORD whether the string still says [YOUR-PASSWORD] or
+    # already has the raw password pasted in (which may contain @, / or # and break URL parsing).
+    scheme, separator, rest = pooler_url.partition("://")
+    credentials, at, host = rest.rpartition("@")
+    if not (separator and at):
+        sys.exit("SUPABASE_DB_POOLER_URL does not look like a postgresql:// connection string.")
+    user = credentials.split(":", 1)[0]
+    parts = urlsplit(f"{scheme}://{user}:{quote(password, safe='')}@{host}")
     if parts.scheme not in ("postgres", "postgresql") or not parts.hostname:
         sys.exit("SUPABASE_DB_POOLER_URL does not look like a postgresql:// connection string.")
     return urlunsplit(("postgresql+asyncpg", parts.netloc, parts.path, "ssl=require", ""))

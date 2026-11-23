@@ -1,0 +1,15 @@
+# Never uploaded to Vercel: secrets, local data, and build/tool output.
+deploy/
+**/.env
+**/.env.*
+!**/.env.example
+backend/.venv/
+backend/storage/
+backend/tests/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/node_modules/
+frontend/dist/
+infra/
+.claude/

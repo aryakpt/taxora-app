@@ -120,18 +120,17 @@ queued ─▶ processing ─▶ review_required ─(reviewer)─▶ approved ─
 
 ## Deployment
 
-Free tier, no payment card: **Vercel** (frontend) → **Hugging Face Space** (API, Docker) → **Supabase** (PostgreSQL + pgvector, and Storage for the original PDFs). Vercel forwards `/api/*` to the Space (`frontend/vercel.json`), so the browser sees one site and the session cookie stays first-party.
+Free tier, no payment card: one **Vercel** project serves the frontend and the API (Vercel Services, `vercel.json`: `/api/*` → FastAPI in `backend/`, everything else → the Vite build in `frontend/`, region Tokyo), with **Supabase** for PostgreSQL + pgvector and Storage for the original PDFs. Frontend and API share one origin, so the session cookie is first-party and no CORS is involved.
 
-Secrets live only in `deploy/.env.production` (git-ignored; template `deploy/env.production.example`), in the Space's settings, and in GitHub's `HF_TOKEN` secret. The `make` commands below read that file and print only variable names.
+Secrets live only in `deploy/.env.production` (git-ignored; template `deploy/env.production.example`) and in Vercel's environment variables. The `make` commands below read that file and print only variable names; `.vercelignore` keeps `deploy/` and every `.env` out of uploads.
 
-1. **Supabase**: create a project (region Singapore; Data API off). Fill `SUPABASE_URL`, a secret API key, the *Session pooler* connection string (with `[YOUR-PASSWORD]` left in) and the database password.
-2. **Database**: `make prod-migrate`, then `make prod CMD=prepare-storage` (creates the private `documents` bucket).
+1. **Supabase**: create a project (Data API off). Fill `SUPABASE_URL`, a **secret** API key (`sb_secret_…`, not the publishable one), the *Session pooler* connection string and the database password. The direct connection (`db.<ref>.supabase.co`) is IPv6-only; use the pooler.
+2. **Database**: `make prod-migrate`, then `make prod CMD=prepare-storage` (creates the private `documents` bucket). Run `make prod-migrate` again whenever a release adds a migration.
 3. **Knowledge**: `make prod CMD=copy-knowledge` copies published regulations with their embeddings and PDFs from the local database (no embedding quota spent; existing rows are skipped). Chunks the local database never embedded are copied without a vector: then `make prod CMD=reindex`.
-4. **API**: with a Hugging Face *write* token in `HF_TOKEN`, `make deploy-api-env` creates the Space `<username>/taxora-api` and sets its settings and secrets (a session signing key is generated once and kept in the file); `make deploy-api` uploads `backend/` and the Space builds the Dockerfile. `make deploy-status` and `make deploy-logs` follow it. `make deploy-github` lets the *Deploy API* workflow redeploy on every merge to `main`.
-5. **Frontend**: point the `/api` rewrite in `frontend/vercel.json` at `https://<username>-taxora-api.hf.space`, then `make deploy-web` (links `frontend/` to the Vercel project `VERCEL_PROJECT` on first run). Set `FRONTEND_ORIGIN` to the site's URL and run `make deploy-api-env` again.
-6. **Accounts**: register on the site, then `make prod CMD="set-role you@example.com admin"`. For Google sign-in, add the site's URL to the OAuth client's *Authorized JavaScript origins* and set `GOOGLE_CLIENT_ID`.
+4. **Deploy**: `make deploy-env` links the repository to the Vercel project `VERCEL_PROJECT` and sets the production variables (a session signing key is generated once and kept in the file); `make deploy` builds and deploys both services; `make deploy-logs` shows runtime logs. Connect the repository in the Vercel dashboard (Project → Settings → Git) to deploy every merge to `main`.
+5. **Accounts**: register on the site, then `make prod CMD="set-role you@example.com admin"`. For Google sign-in, add the site's URL to the OAuth client's *Authorized JavaScript origins*.
 
-Free-plan limits: a Space sleeps after about 48 hours without traffic and runs in the US/EU (each database round trip to Singapore adds latency); Supabase pauses a project after a week without activity; the Gemini free tier allows about 1,000 embedding requests a day (one per chat question, one per chunk when ingesting). Rate limits count the visitor's IP from `X-Forwarded-For` (`TRUSTED_PROXY_HOPS`); a client calling the Space directly can still forge it, so the limits are a brake, not a guarantee.
+Serverless limits (Hobby): a request runs at most 300 s, so documents are processed inside the upload request (`INGESTION_INLINE`), and request bodies are capped at 4.5 MB (`MAX_UPLOAD_BYTES` is 4 MB): submit larger documents by their official link, or ingest them locally and `copy-knowledge`. Supabase pauses a project after a week without activity; the Gemini free tier allows about 1,000 embedding requests a day per Google Cloud project (one per chat question, one per chunk when ingesting).
 
 ## Tests and checks
 

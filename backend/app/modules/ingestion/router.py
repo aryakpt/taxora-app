@@ -20,12 +20,23 @@ async def _job_or_404(session, job_id: uuid.UUID) -> IngestionJob:
     return job
 
 
+async def _start(job: IngestionJob, background: BackgroundTasks, session) -> None:
+    """Process the job after the response (a long-running server), or before it (serverless hosting, where
+    nothing is guaranteed to run once the response is sent; see INGESTION_INLINE)."""
+    if not settings.ingestion_inline:
+        background.add_task(service.run_job, job.id)
+        return
+    await session.commit()  # run_job uses its own session and must see the new job
+    await service.run_job(job.id)
+    await session.refresh(job)
+
+
 @router.post("", status_code=status.HTTP_202_ACCEPTED)
 async def create_from_url(body: UrlSubmission, background: BackgroundTasks, session: SessionDep,
                           user: AdminUser):
     """Queue a document from an official PDF link. Processing continues after this response."""
     job = await service.create_job(session, user, body)
-    background.add_task(service.run_job, job.id)
+    await _start(job, background, session)
     return await service.describe(session, job)
 
 
@@ -39,7 +50,8 @@ async def create_from_upload(
     """Queue an uploaded PDF. `source_url` is optional: when given, it is the official link shown to users."""
     content = await form.file.read(settings.max_upload_bytes + 1)
     if len(content) > settings.max_upload_bytes:
-        raise HTTPException(413, "Dokumen melebihi batas ukuran")
+        raise HTTPException(413, f"Dokumen melebihi batas ukuran unggah ({settings.max_upload_bytes // 2**20} MB). "
+                                 "Untuk dokumen besar, kirim tautan resminya.")
     if not content.startswith(b"%PDF"):
         raise HTTPException(415, "Hanya dokumen PDF yang diterima")
     try:
@@ -48,7 +60,7 @@ async def create_from_upload(
         raise HTTPException(503, str(exc)) from exc
     job = await service.create_job(session, user, form, filename=(form.file.filename or "upload.pdf")[:300],
                                    storage_key=key)
-    background.add_task(service.run_job, job.id)
+    await _start(job, background, session)
     return await service.describe(session, job)
 
 
@@ -145,5 +157,9 @@ async def delete_document(job_id: uuid.UUID, session: SessionDep, user: AdminUse
 @router.post("/{job_id}/retry", status_code=status.HTTP_202_ACCEPTED)
 async def retry(job_id: uuid.UUID, background: BackgroundTasks, session: SessionDep, user: AdminUser):
     result = await _transition(service.retry, session, job_id, user)
-    background.add_task(service.run_job, job_id)
-    return result
+    if not settings.ingestion_inline:
+        background.add_task(service.run_job, job_id)
+        return result
+    await session.commit()
+    await service.run_job(job_id)
+    return await service.describe(session, await _job_or_404(session, job_id))

@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     ingestion_fetch_timeout_seconds: float = 30
     document_storage_dir: Path = BACKEND_DIR / "storage" / "documents"
     max_upload_bytes: int = 30 * 1024 * 1024
+    # Serverless hosting (Vercel): process documents inside the request instead of after the response, and at
+    # startup only fail jobs untouched for this many minutes (other instances may still be working).
+    ingestion_inline: bool = False
+    ingestion_stale_minutes: int = 0
     # Production: originals go to Supabase Storage instead of the (ephemeral) server disk; see ingestion/storage.py.
     supabase_url: str = ""
     supabase_secret_key: str = ""
