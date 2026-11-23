@@ -82,8 +82,7 @@ async def test_document_is_processed_reviewed_published_and_then_searchable(clie
 
     library = (await client.get("/api/v1/regulations")).json()
     assert [regulation["number"] for regulation in library] == ["1 TAHUN 2026"]
-    chat = await client.post("/api/v1/chat", json={"question": "Berapa tarif pajak atas sewa?",
-                                                   "context": {"tax_period": "2026"}})
+    chat = await client.post("/api/v1/chat", json={"question": "Berapa tarif pajak atas sewa?"})
     assert chat.json()["answer_status"] == "insufficient_evidence"  # evidence found, LLM not configured
     assert "dikonfigurasi" in chat.json()["answer"]
 

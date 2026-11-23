@@ -26,7 +26,13 @@ class Settings(BaseSettings):
     # LLM: any OpenAI-compatible chat API. Defaults to OpenRouter's free-model router.
     llm_api_key: str = ""
     llm_base_url: str = "https://openrouter.ai/api/v1"
-    llm_model: str = "openrouter/free"
+    # Tried in order. A retry (empty, cut-off, or invalid reply) starts at the next model, and on OpenRouter
+    # the rest of the list is sent as server-side fallbacks, so a rate-limited or withdrawn model is skipped
+    # without a round trip. Measured 2026-11-23 on the chat prompt: ernie 12-19 s but about half cut off;
+    # flint about 44 s and reliable; dots 28-37 s, about half cut off. Free models change often: re-check
+    # with `make ask-raw` and https://openrouter.ai/models?max_price=0 when chat starts failing.
+    llm_model: str = "baidu/ernie-5.5-flash-preview:free"
+    llm_fallback_models: list[str] = ["recursive/flint-v1.0:free", "dots-studio/dots-3-note-preview:free"]
     # Per attempt. Free models answered in 11-70 s on a 6k-token prompt (measured 2026-11-23).
     llm_timeout_seconds: float = 60
     # Reasoning models count their thinking against this budget. Raising it does not help: measured at 8000,

@@ -48,9 +48,9 @@ export default function App() {
     }
   }
 
-  async function sendQuestion(question: string, period: string, taxpayer: string) {
+  async function sendQuestion(question: string) {
     setError('');
-    await chat.sendQuestion(question, period, taxpayer, i18n.resolvedLanguage === 'id' ? 'id' : 'en');
+    await chat.sendQuestion(question, i18n.resolvedLanguage === 'id' ? 'id' : 'en');
   }
 
   async function signOut() {

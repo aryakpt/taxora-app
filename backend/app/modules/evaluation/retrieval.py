@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.modules.evaluation.models import EvaluationRun
 from app.modules.generation.embeddings import Embedder
+from app.modules.query_understanding.period import reference_date
 from app.modules.query_understanding.scope import assess_scope
 from app.modules.retrieval.service import hybrid_search
 
@@ -33,7 +34,6 @@ class Case(BaseModel):
     expect: Literal["answer", "out_of_scope", "not_in_kb"]
     regulation: str | None = None
     articles: list[str] = []
-    tax_period: str | None = None
 
 
 class Dataset(BaseModel):
@@ -70,7 +70,8 @@ async def evaluate_case(session: AsyncSession, case: Case, embedder: Embedder,
     if not scope.in_scope:
         return CaseResult(case.id, case.expect, passed=False if case.expect == "answer" else None, in_scope=False)
 
-    evidence = await hybrid_search(session, case.question, NOBODY, case.tax_period, embedder, statuses=statuses)
+    evidence = await hybrid_search(session, case.question, NOBODY, reference_date(case.question), embedder,
+                                   statuses=statuses)
     retrieved = [_label(item) for item in evidence]
     if case.expect == "not_in_kb":
         return CaseResult(case.id, case.expect, passed=None, in_scope=True, retrieved=retrieved)

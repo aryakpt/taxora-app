@@ -1,7 +1,7 @@
 """End-to-end chat flow with fake AI providers and a labeled fixture regulation (not real law)."""
 
 import json
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 from sqlalchemy import select
@@ -44,8 +44,8 @@ async def sign_in(client):
     assert response.status_code == 201
 
 
-async def ask(client, question: str, **context):
-    response = await client.post("/api/v1/chat", json={"question": question, "context": context})
+async def ask(client, question: str, **extra):
+    response = await client.post("/api/v1/chat", json={"question": question, **extra})
     assert response.status_code == 200, response.text
     return response.json()
 
@@ -85,7 +85,7 @@ async def test_valid_cited_answer_is_returned_with_verbatim_source_quote(client,
     llm = fake_ai.enable_llm(llm_answer(chunk_id))
     await sign_in(client)
 
-    body = await ask(client, "Berapa tarif pajak atas sewa?", tax_period="2026")
+    body = await ask(client, "Berapa tarif pajak atas sewa?")
 
     assert body["answer_status"] == "answered"
     assert [s["evidence_id"] for s in body["sources"]] == [str(chunk_id)]
@@ -98,7 +98,7 @@ async def test_fabricated_quote_leads_to_insufficient_evidence(client, fake_ai):
     fake_ai.enable_llm(llm_answer(chunk_id, quote="dipotong pajak sebesar dua puluh persen dari bruto"))
     await sign_in(client)
 
-    body = await ask(client, "Berapa tarif pajak atas sewa?", tax_period="2026")
+    body = await ask(client, "Berapa tarif pajak atas sewa?")
 
     assert body["answer_status"] == "insufficient_evidence"
     assert body["sources"] == []
@@ -141,7 +141,7 @@ async def test_answer_trace_is_stored_without_the_prompt(client, fake_ai):
     fake_ai.enable_llm(llm_answer(chunk_id))
     await sign_in(client)
 
-    await ask(client, "Berapa tarif pajak atas sewa?", tax_period="2026")
+    await ask(client, "Berapa tarif pajak atas sewa?")
 
     async with SessionLocal() as session:
         stored = await session.scalar(select(Message).where(Message.role == "assistant"))
@@ -157,17 +157,46 @@ async def stored_answer() -> Message:
                                     .order_by(Message.created_at.desc()).limit(1))
 
 
+async def test_the_answer_id_is_returned_for_feedback(client, fake_ai):
+    chunk_id = await seed_fixture_regulation()
+    fake_ai.enable_llm(llm_answer(chunk_id))
+    await sign_in(client)
+
+    body = await ask(client, "Berapa tarif pajak atas sewa?")
+
+    assert body["message_id"] == str((await stored_answer()).id)
+    assert (await client.post("/api/v1/feedback", json={"message_id": body["message_id"], "rating": "positive"})
+            ).status_code in (200, 201)
+
+
+async def test_a_year_in_the_question_selects_the_rules_of_that_year(client, fake_ai):
+    chunk_id = await seed_fixture_regulation()
+    async with SessionLocal() as session, session.begin():
+        version = await session.scalar(select(RegulationVersion))
+        version.effective_from = date(2026, 1, 1)
+    llm = fake_ai.enable_llm(llm_answer(chunk_id))
+    await sign_in(client)
+
+    before = await ask(client, "Berapa tarif pajak atas sewa untuk tahun pajak 2025?")
+    current = await ask(client, "Berapa tarif pajak atas sewa?")
+
+    assert before["answer_status"] == "insufficient_evidence" and len(llm.calls) == 1
+    assert current["answer_status"] == "answered"
+    assert (await stored_answer()).metadata_json["reference_date"] == date.today().isoformat()
+
+
 @pytest.mark.parametrize("first_failure", [LLMError("empty completion"), "not json at all"])
 async def test_a_failed_attempt_is_retried_and_recorded(client, fake_ai, first_failure):
     chunk_id = await seed_fixture_regulation()
     llm = fake_ai.enable_llm([first_failure, llm_answer(chunk_id)])
     await sign_in(client)
 
-    body = await ask(client, "Berapa tarif pajak atas sewa?", tax_period="2026")
+    body = await ask(client, "Berapa tarif pajak atas sewa?")
 
     assert body["answer_status"] == "answered" and len(llm.calls) == 2
     trace = (await stored_answer()).metadata_json
     assert trace["model"] == "fake-model-2" and len(trace["llm_errors"]) == 1
+    assert llm.attempts == [0, 1]  # the retry asks the LLM client for the next model
 
 
 async def test_attempts_are_limited(client, fake_ai, monkeypatch):
@@ -185,7 +214,7 @@ async def test_follow_up_questions_are_understood_with_the_previous_question(cli
     chunk_id = await seed_fixture_regulation()
     llm = fake_ai.enable_llm(llm_answer(chunk_id))
     await sign_in(client)
-    first = await ask(client, "Berapa tarif pajak atas sewa?", tax_period="2026")
+    first = await ask(client, "Berapa tarif pajak atas sewa?")
 
     # On its own this has no tax terms and is refused; as a follow-up it is searched with the first question.
     alone = await ask(client, "Bagaimana kalau tahun depan?")

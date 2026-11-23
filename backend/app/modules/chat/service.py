@@ -14,6 +14,7 @@ from app.modules.conversations.models import Conversation, Message
 from app.modules.generation import providers
 from app.modules.generation.llm import LLMClient, LLMError
 from app.modules.generation.prompts import PROMPT_VERSION, Turn, system_prompt, user_prompt
+from app.modules.query_understanding.period import reference_date
 from app.modules.query_understanding.scope import assess_scope
 from app.modules.retrieval.service import hybrid_search
 
@@ -33,7 +34,6 @@ CHAT_COPY = {
         "api_key_required": "LLM_API_KEY must be configured to generate an evidence-based answer.",
         "no_evidence": "I could not find sufficient verified legal sources to answer. Please clarify the topic, transaction, or tax period; a definitive answer cannot be provided from the current knowledge base.",
         "no_verified_evidence": "The knowledge base does not contain relevant verified evidence.",
-        "missing_period": "Tax period or transaction date (if the question is time-sensitive).",
         "out_of_scope": "I can only help with questions about Indonesian taxation, specifically Income Tax (PPh) and Value Added Tax (PPN). Please ask a tax question.",
         "claims_removed": "Some statements could not be verified against the sources and were removed.",
     },
@@ -45,7 +45,6 @@ CHAT_COPY = {
         "api_key_required": "Konfigurasi LLM_API_KEY diperlukan untuk menghasilkan jawaban berbasis evidence.",
         "no_evidence": "Saya belum menemukan sumber hukum terverifikasi yang cukup untuk menjawab. Coba perjelas topik, transaksi, atau periode pajak; jawaban definitif tidak dapat diberikan dari knowledge base saat ini.",
         "no_verified_evidence": "Knowledge base belum memuat evidence terverifikasi yang relevan.",
-        "missing_period": "Periode pajak atau tanggal transaksi (jika pertanyaan bergantung pada waktu).",
         "out_of_scope": "Saya hanya dapat membantu pertanyaan seputar perpajakan Indonesia, khususnya Pajak Penghasilan (PPh) dan Pajak Pertambahan Nilai (PPN). Silakan ajukan pertanyaan perpajakan.",
         "claims_removed": "Sebagian pernyataan tidak dapat diverifikasi terhadap sumber dan telah dihapus.",
     },
@@ -74,23 +73,23 @@ async def answer_question(body: ChatRequest, session: AsyncSession, user: User) 
     conversation = await _conversation_for(body, session, user)
     history = await _history(session, conversation.id)
     session.add(Message(conversation_id=conversation.id, role="user", content=body.question,
-                        metadata_json={"tax_period": body.context.tax_period, "taxpayer_type": body.context.taxpayer_type,
-                                       "response_language": body.response_language}))
+                        metadata_json={"response_language": body.response_language}))
 
     outcome = await _decide(body, session, user, request_id, history)
-    if outcome.status not in (AnswerStatus.out_of_scope, AnswerStatus.failed) and not body.context.tax_period:
-        outcome.missing.append(CHAT_COPY[body.response_language]["missing_period"])
 
     latency_ms = round((time.monotonic() - started) * 1000)
-    session.add(Message(conversation_id=conversation.id, role="assistant", content=outcome.answer,
-                        metadata_json={"request_id": str(request_id), "answer_status": outcome.status.value,
-                                       "evidence_ids": [str(item["id"]) for item in outcome.evidence],
-                                       "cited_evidence_ids": [str(s.evidence_id) for s in outcome.sources],
-                                       "latency_ms": latency_ms, "response_language": body.response_language,
-                                       "prompt_version": PROMPT_VERSION, **outcome.trace}))
+    answer = Message(
+        id=uuid.uuid4(), conversation_id=conversation.id, role="assistant", content=outcome.answer,
+        metadata_json={"request_id": str(request_id), "answer_status": outcome.status.value,
+                       "evidence_ids": [str(item["id"]) for item in outcome.evidence],
+                       "cited_evidence_ids": [str(s.evidence_id) for s in outcome.sources],
+                       "latency_ms": latency_ms, "response_language": body.response_language,
+                       "prompt_version": PROMPT_VERSION, **outcome.trace},
+    )
+    session.add(answer)
     await session.flush()
-    return ChatResponse(request_id=request_id, conversation_id=conversation.id, answer_status=outcome.status,
-                        answer=outcome.answer, claims=outcome.claims, sources=outcome.sources,
+    return ChatResponse(request_id=request_id, conversation_id=conversation.id, message_id=answer.id,
+                        answer_status=outcome.status, answer=outcome.answer, claims=outcome.claims, sources=outcome.sources,
                         missing_information=outcome.missing, limitations=outcome.limitations, latency_ms=latency_ms)
 
 
@@ -139,7 +138,9 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
     if not scope.in_scope:
         return Outcome(AnswerStatus.out_of_scope, copy["out_of_scope"], trace=trace)
 
-    evidence = await hybrid_search(session, search_text, user.id, body.context.tax_period, embedder)
+    as_of = reference_date(search_text)
+    trace["reference_date"] = as_of.isoformat()
+    evidence = await hybrid_search(session, search_text, user.id, as_of, embedder)
     if not evidence:
         return Outcome(AnswerStatus.insufficient_evidence, copy["no_evidence"],
                        limitations=[copy["no_verified_evidence"]], trace=trace)
@@ -148,8 +149,7 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
         return Outcome(AnswerStatus.insufficient_evidence, copy["unconfigured"],
                        limitations=[copy["api_key_required"]], evidence=evidence, trace=trace)
 
-    prompt = user_prompt(body.question, evidence, body.context.tax_period, body.context.taxpayer_type,
-                         body.context.transaction_type, history)
+    prompt = user_prompt(body.question, evidence, history)
     try:
         result = await _generate(llm, system_prompt(body.response_language), prompt, evidence, request_id, trace)
     except LLMError:
@@ -168,7 +168,7 @@ async def _generate(llm: LLMClient, system: str, prompt: str, evidence: list[dic
     trace["model"] = llm.model
     for attempt in range(1, max(1, settings.llm_attempts) + 1):
         try:
-            reply = await llm.complete_json(system, prompt)
+            reply = await llm.complete_json(system, prompt, attempt - 1)
             trace["model"] = reply.model
             return parse_and_validate(reply.text, evidence)
         except (LLMError, MalformedOutput) as exc:

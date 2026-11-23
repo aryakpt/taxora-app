@@ -13,7 +13,7 @@ interface Props {
   error: string
   feedback: Record<string, FeedbackRating>
   setError: (message: string) => void
-  onSend: (question: string, period: string, taxpayer: string) => void
+  onSend: (question: string) => void
   onFeedback: (messageId: string | undefined, rating: FeedbackRating) => void
 }
 

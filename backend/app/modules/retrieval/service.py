@@ -36,28 +36,19 @@ def keyword_tsquery(question: str) -> str | None:
     return " | ".join(dict.fromkeys(numbers + words)) or None
 
 
-def temporal_reference_date(tax_period: str | None) -> date:
-    try:
-        year = int(tax_period[:4]) if tax_period else None
-        return date(year, 12, 31) if year else date.today()
-    except (ValueError, TypeError):
-        return date.today()
-
-
 async def hybrid_search(
     session: AsyncSession,
     query: str,
     user_id: uuid.UUID,
-    tax_period: str | None,
+    reference_date: date,
     embedder: Embedder,
     statuses: tuple[str, ...] = ("published",),
 ) -> list[dict]:
-    """Keyword + vector search over published, effective, permitted chunks, fused with Reciprocal
+    """Keyword + vector search over published chunks in force on `reference_date` that the user may see, fused with Reciprocal
     Rank Fusion. Each channel only returns chunks above its relevance threshold, so an unrelated
     question returns no evidence instead of the "least bad" chunks.
 
     `statuses` exists for offline evaluation of documents still under review; chat always uses the default."""
-    reference_date = temporal_reference_date(tax_period)
     base = (
         select(
             DocumentChunk.id.label("chunk_id"),
