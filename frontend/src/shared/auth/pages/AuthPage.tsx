@@ -3,6 +3,7 @@ import { ArrowRight, ShieldCheck, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../AuthProvider'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { ApiError } from '../../api/client'
 import { GoogleSignInButton } from '../components/GoogleSignInButton'
 
@@ -54,7 +55,7 @@ export function AuthPage() {
   }
 
   return <main className="auth-screen">
-    <div className="auth-toolbar"><a className="brand auth-brand" href="/"><span className="brand-mark"><span /></span><span className="brand-name">taxora</span></a><LanguageSwitcher /></div>
+    <div className="auth-toolbar"><a className="brand auth-brand" href="/"><span className="brand-mark"><span /></span><span className="brand-name">taxora</span></a><div className="auth-toolbar-actions"><ThemeToggle /><LanguageSwitcher /></div></div>
     <section className="auth-card" aria-labelledby="auth-title">
       <div className="auth-emblem"><Sparkles size={20} /></div>
       <p className="auth-eyebrow"><ShieldCheck size={13} /> {t('auth.secureAccount')}</p>

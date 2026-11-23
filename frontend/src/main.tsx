@@ -5,6 +5,7 @@ import { I18nextProvider } from 'react-i18next'
 import { AuthProvider } from './shared/auth/AuthProvider'
 import App from './App'
 import i18n from './shared/i18n'
+import './shared/theme/theme'
 import './shared/styles/main.scss'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><I18nextProvider i18n={i18n}><AuthProvider><BrowserRouter><App /></BrowserRouter></AuthProvider></I18nextProvider></React.StrictMode>)
