@@ -210,6 +210,24 @@ async def stored_answer() -> Message:
                                     .order_by(Message.created_at.desc()).limit(1))
 
 
+async def test_answers_follow_the_language_of_the_question_not_the_interface(client, fake_ai):
+    chunk_id = await seed_fixture_regulation()
+    llm = fake_ai.enable_llm(llm_answer(chunk_id))
+    await sign_in(client)
+
+    indonesian = await ask(client, "Berapa tarif pajak atas sewa?", response_language="en")
+    refused = await ask(client, "Bagaimana resep rendang yang enak?", response_language="en")
+    english = await ask(client, "What is the tax rate on rent?", response_language="id")
+    unclear = await ask(client, "halo", response_language="en")
+
+    assert "Bahasa Indonesia" in llm.calls[0][0] and "English" in llm.calls[1][0]
+    assert refused["answer"].startswith("Saya hanya dapat membantu")
+    assert english["answer_status"] == "answered"
+    assert unclear["answer"].startswith("I can only help")
+    assert indonesian["answer_status"] == "answered"
+    assert (await stored_answer()).metadata_json["response_language"] == "en"  # "halo" followed the interface
+
+
 async def test_the_answer_id_is_returned_for_feedback(client, fake_ai):
     chunk_id = await seed_fixture_regulation()
     fake_ai.enable_llm(llm_answer(chunk_id))
@@ -260,7 +278,7 @@ async def test_used_up_quota_is_not_retried_and_says_when_it_resets(client, fake
     await sign_in(client)
 
     indonesian = await ask(client, "Berapa tarif pajak atas sewa?", response_language="id")
-    english = await ask(client, "Berapa tarif pajak atas sewa?", response_language="en")
+    english = await ask(client, "What is the tax rate on rent?", response_language="id")
 
     assert indonesian["answer_status"] == "failed" and len(llm.calls) == 2  # one call per question, no retry
     assert "Kuota harian" in indonesian["answer"] and "07.00 WIB (24-11-2026)" in indonesian["answer"]
