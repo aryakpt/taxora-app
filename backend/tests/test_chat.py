@@ -1,6 +1,7 @@
 """End-to-end chat flow with fake AI providers and a labeled fixture regulation (not real law)."""
 
 import json
+import uuid
 from datetime import date, datetime, timezone
 
 import pytest
@@ -226,6 +227,38 @@ async def test_answers_follow_the_language_of_the_question_not_the_interface(cli
     assert unclear["answer"].startswith("I can only help")
     assert indonesian["answer_status"] == "answered"
     assert (await stored_answer()).metadata_json["response_language"] == "en"  # "halo" followed the interface
+
+
+async def test_a_reopened_conversation_shows_the_same_sources_and_notes(client, fake_ai):
+    chunk_id = await seed_fixture_regulation()
+    fake_ai.enable_llm(llm_answer(chunk_id, limitations=["Tarif dapat berubah."],
+                                  missing_information=["Status PKP penyewa."]))
+    await sign_in(client)
+    answered = await ask(client, "Berapa tarif pajak atas sewa?")
+
+    detail = (await client.get(f"/api/v1/conversations/{answered['conversation_id']}")).json()
+    question, answer = detail["messages"]
+
+    assert answer["id"] == answered["message_id"] and answer["answer_status"] == answered["answer_status"]
+    assert answer["sources"] == answered["sources"] and answer["sources"][0]["quote"] == QUOTE
+    assert answer["limitations"] == answered["limitations"]
+    assert answer["missing_information"] == answered["missing_information"] == ["Status PKP penyewa."]
+    assert answer["latency_ms"] == answered["latency_ms"]
+    # The server-side trace is not sent to the browser.
+    assert "metadata" not in answer and "model" not in str(answer) and "prompt_version" not in str(answer)
+    assert set(question) == {"id", "role", "content"}
+
+
+async def test_answers_stored_before_sources_were_kept_still_open(client, fake_ai):
+    await sign_in(client)
+    first = await ask(client, "Bagaimana kalau tahun depan?")
+    async with SessionLocal() as session, session.begin():
+        stored = await session.get(Message, uuid.UUID(first["message_id"]))
+        stored.metadata_json = {"answer_status": "answered", "latency_ms": 900}  # older shape, no "display"
+
+    answer = (await client.get(f"/api/v1/conversations/{first['conversation_id']}")).json()["messages"][1]
+
+    assert answer["sources"] == [] and answer["limitations"] == [] and answer["latency_ms"] == 900
 
 
 async def test_the_answer_id_is_returned_for_feedback(client, fake_ai):

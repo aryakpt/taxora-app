@@ -1,10 +1,21 @@
 import type {ApiRequest} from '../../../shared/api/client';
-import type {ChatMessage, ConversationSummary} from '../../../shared/types/tax';
+import type {ChatMessage, ConversationSummary, Source} from '../../../shared/types/tax';
+
+interface StoredMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  answer_status?: string | null;
+  sources?: Source[];
+  missing_information?: string[];
+  limitations?: string[];
+  latency_ms?: number | null;
+}
 
 interface ConversationDetail {
   id: string;
   title: string;
-  messages: Array<{id: string; role: 'user' | 'assistant'; content: string; metadata?: {answer_status?: string}}>;
+  messages: StoredMessage[];
 }
 
 export function createConversationsApi(request: ApiRequest) {
@@ -15,11 +26,16 @@ export function createConversationsApi(request: ApiRequest) {
     remove: (id: string) => request<{deleted: boolean}>(`/api/v1/conversations/${id}`, {method: 'DELETE'}),
     async get(id: string): Promise<ChatMessage[]> {
       const detail = await request<ConversationDetail>(`/api/v1/conversations/${id}`);
+      // Same shape as a fresh answer, so a reopened conversation looks exactly as it did.
       return detail.messages.map((message) => ({
         id: message.id,
         role: message.role,
         content: message.content,
-        status: message.metadata?.answer_status,
+        status: message.answer_status ?? undefined,
+        sources: message.sources ?? [],
+        missing: message.missing_information ?? [],
+        limitations: message.limitations ?? [],
+        latency: message.latency_ms ?? undefined,
       }));
     },
   };
