@@ -3,8 +3,9 @@
  *
  * The stylesheets carry ~200 hand-picked light colors. Instead of duplicating every rule by hand, this PostCSS
  * plugin adds a `[data-theme="dark"]` twin after each rule that sets a color, with every color passed through
- * `toDark`: lightness is inverted in OKLCH (so a dark text on a light card stays readable as light text on a dark
- * card), neutrals are tinted toward the brand teal, and the lightest surface lands exactly on DARKEST.
+ * `toDark`: lightness is inverted in OKLCH along a measured curve (dark text on a light card stays readable as light
+ * text on a dark card; cards sit slightly above the page; the sidebar lands exactly on DARKEST), neutrals take the
+ * brand teal, and accents keep their hue.
  * New styles therefore get a dark version automatically. Hand-tuned exceptions live in
  * `src/shared/styles/themes/_dark.scss`; rules that already mention `data-theme` are left alone.
  */
@@ -61,8 +62,48 @@ function format(lch: Lch): string {
 }
 
 const base = rgbToLch(...parseHex(DARKEST))
-const LIGHTEST_TEXT = 0.95 // where the darkest light-theme ink ends up
-const DARKEST_INK = 0.25 // light-theme lightness that maps to LIGHTEST_TEXT
+
+/** Piecewise-linear lookup through [x, y] points sorted by x. */
+function curve(points: [number, number][], x: number): number {
+  if (x <= points[0][0]) return points[0][1]
+  for (let i = 1; i < points.length; i++) {
+    const [x1, y1] = points[i]
+    if (x <= x1) {
+      const [x0, y0] = points[i - 1]
+      return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+    }
+  }
+  return points[points.length - 1][1]
+}
+
+// Light-theme lightness -> dark-theme lightness (OKLCH). Measured on the stylesheets' own colors:
+//   white cards and inputs (1.0)   -> 0.281  raised a little above the page
+//   sidebar off-white (0.988)      -> 0.239  DARKEST
+//   page canvas (0.979)            -> 0.254
+//   hover fills (0.96)             -> 0.312
+//   borders (0.93) / strong (0.87) -> 0.36 / 0.41
+//   muted text (0.60-0.68)         -> 0.66-0.72
+//   body text (0.47) / ink (0.29)  -> 0.82 / 0.935
+const SURFACES: [number, number][] = [[0.2, 0.95], [0.29, 0.935], [0.386, 0.88], [0.471, 0.82], [0.596, 0.72],
+  [0.682, 0.66], [0.728, 0.6], [0.874, 0.408], [0.93, 0.36], [0.96, 0.312], [0.979, 0.254]]
+const SIDEBAR_BAND = 0.984 // 0.984..0.995: the sidebar's off-white
+const CARD_BAND = 0.995 // above: white
+
+function darkLightness(l: number): number {
+  if (l >= CARD_BAND) return 0.281
+  if (l >= SIDEBAR_BAND) return base.l
+  return curve(SURFACES, l)
+}
+
+// Neutrals take the brand teal: saturated near the background, fading to a soft, slightly warm white for text.
+// Hues in radians on the short arc: teal (212deg) -> green-grey (180deg), never through red.
+const BASE_HUE = base.h < 0 ? base.h + 2 * Math.PI : base.h
+const NEUTRAL_CHROMA: [number, number][] = [[0.26, base.c], [0.41, 0.036], [0.93, 0.01]]
+const NEUTRAL_HUE: [number, number][] = [[0.5, BASE_HUE], [0.93, Math.PI]]
+
+/** Below this chroma a color counts as grey: stricter for pale tints (a soft green or red is meant), looser
+ * for the bluish greys used for text. */
+const neutralBelow = (l: number) => (l > 0.85 ? 0.012 : l < 0.45 ? 0.045 : 0.03)
 
 /** The dark-theme counterpart of one light-theme color. */
 export function toDark(r: number, g: number, b: number, alpha = 1): string {
@@ -71,16 +112,21 @@ export function toDark(r: number, g: number, b: number, alpha = 1): string {
     // A shadow or scrim: stays dark, a little stronger so it still reads on a dark page.
     return format({ l: 0, c: 0, h: 0, alpha: Math.min(0.75, alpha * 2.5) })
   }
-  const l = base.l + (1 - Math.max(color.l, DARKEST_INK)) * (LIGHTEST_TEXT - base.l) / (1 - DARKEST_INK)
-  const depth = (LIGHTEST_TEXT - l) / (LIGHTEST_TEXT - base.l) // 1 at the darkest surface, 0 at the lightest text
-  if (color.c < 0.012) {
-    // Neutral greys become brand-teal greys: richer near the background, almost plain near the text.
-    return format({ l, c: 0.006 + (base.c - 0.006) * depth, h: base.h, alpha })
+  const l = darkLightness(color.l)
+  const neutral = color.c < neutralBelow(color.l)
+  if (neutral) {
+    return format({ l, c: curve(NEUTRAL_CHROMA, l), h: curve(NEUTRAL_HUE, l), alpha })
   }
-  // Strong accents (gold, brand green, error red) keep most of their own brightness instead of flipping.
-  const vivid = Math.min(1, color.c / 0.12)
-  const accentL = l + (Math.max(color.l, 0.6) - l) * vivid
-  return format({ l: accentL, c: color.c * (1 + 0.6 * depth), h: color.h, alpha })
+  if (color.l > 0.85) {
+    // A pale tint behind a status or a selection (soft green, soft red, soft gold): a deep version of its hue.
+    // Deep greens read as olive, so green tints lean halfway to the brand teal.
+    const hue = color.h < 0 ? color.h + 2 * Math.PI : color.h
+    const greenish = hue > (2 * Math.PI) / 3 && hue < BASE_HUE
+    return format({ l: l + 0.02, c: Math.min(0.04, color.c * 2.2), h: greenish ? (hue + BASE_HUE) / 2 : hue, alpha })
+  }
+  // Accents (brand green, gold, error red, navy mark) keep their hue and most of their brightness.
+  const vivid = Math.min(1, color.c / 0.1)
+  return format({ l: l + (Math.max(color.l, 0.68) - l) * vivid, c: color.c, h: color.h, alpha })
 }
 
 const NAMED: Record<string, string> = { white: '#ffffff', black: '#000000' }

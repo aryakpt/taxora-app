@@ -28,6 +28,7 @@ export interface ChatMessage {
 export interface ConversationSummary {
   id: string
   title: string
+  group_id?: string | null
   updated_at?: string
 }
 
@@ -91,4 +92,9 @@ export interface ChatResponse {
   missing_information?: string[]
   limitations?: string[]
   latency_ms: number
+}
+
+export interface ConversationGroup {
+  id: string
+  name: string
 }

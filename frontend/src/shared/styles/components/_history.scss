@@ -88,3 +88,55 @@
     outline: none;
   }
 }
+
+// Groups: a collapsible header per group, its conversations indented below, and drop highlighting.
+.history-heading-actions { display: flex; align-items: center; gap: 2px; }
+
+.history-group { border-radius: 7px; }
+.history-group.dropping, .history-ungrouped.dropping { background: $color-brand-green-soft; box-shadow: inset 0 0 0 1px #b4c9bb; }
+
+.history-group-header {
+  width: 100%;
+  font-weight: 600;
+  color: #4b5761;
+
+  .history-group-chevron { margin-left: -2px; transition: transform $motion-fast; }
+  .history-group-chevron.open { transform: rotate(90deg); }
+}
+
+.history-group-count {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 500;
+  color: #9098a1;
+}
+
+.history-group-entry:hover .history-group-count,
+.history-group-entry.active .history-group-count { visibility: hidden; } // the "more" button takes its place
+
+.history-group-items {
+  margin-left: 14px;
+  padding-left: 6px;
+  border-left: 1px solid $color-border;
+  display: grid;
+  gap: 2px;
+}
+
+.history-group-empty { margin: 4px 0 6px; padding: 0 8px; font-size: 10px; line-height: 1.5; color: #929aa2; }
+
+.history-ungrouped { display: grid; gap: 2px; min-height: 24px; border-radius: 7px; }
+
+.history-subheading { padding: 10px 9px 4px; font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #9098a1; }
+
+.history-list { align-content: start; }
+
+.history-menu {
+  max-height: min(420px, 70vh);
+  overflow-y: auto;
+
+  .history-menu-label { padding: 8px 8px 4px; font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #9098a1; }
+  .history-menu-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .history-menu-check { margin-left: auto; color: $color-brand-green; }
+  .history-menu-divider { height: 1px; margin: 4px; background: $color-border; }
+}

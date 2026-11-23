@@ -38,6 +38,13 @@ $dark-action-hover: #33896f;
   .confirm-dialog-confirm.danger { background: #b4574e; color: #fff; }
   .confirm-dialog-confirm.danger:hover:not(:disabled) { background: #c4655b; }
 
+  // The brand mark keeps its navy with a white leaf, lifted to stay visible on the dark sidebar.
+  .brand-mark { background: #2f5d86; }
+  .brand-mark span { border-color: #fff; }
+
+  // Your own messages: a deep brand-green bubble rather than the olive the generic mapping gives.
+  .message-row.user .user-content { background: #15423a; border-color: #1f5449; color: #e3eeea; }
+
   .send-spinner { border-color: #ffffff66; border-top-color: #fff; }
 
   // The login page's soft spotlight: a lighter center reads as a glow on dark, so keep it subtle.
