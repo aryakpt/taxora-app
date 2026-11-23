@@ -42,7 +42,10 @@ async def create_from_upload(
         raise HTTPException(413, "Dokumen melebihi batas ukuran")
     if not content.startswith(b"%PDF"):
         raise HTTPException(415, "Hanya dokumen PDF yang diterima")
-    key = storage.save(content)
+    try:
+        key = await storage.save(content)
+    except storage.StorageError as exc:
+        raise HTTPException(503, str(exc)) from exc
     job = await service.create_job(session, user, form, filename=(form.file.filename or "upload.pdf")[:300],
                                    storage_key=key)
     background.add_task(service.run_job, job.id)
@@ -76,9 +79,11 @@ async def get_document(job_id: uuid.UUID, session: SessionDep, user: ReviewerUse
         raise HTTPException(404, "Dokumen asli belum tersimpan")
     filename = "".join(c for c in (job.filename or "dokumen.pdf") if c.isalnum() or c in "._- ")[:100] or "dokumen.pdf"
     try:
-        content = storage.load(job.storage_key)
-    except FileNotFoundError as exc:
+        content = await storage.load(job.storage_key)
+    except storage.DocumentNotFound as exc:
         raise HTTPException(404, "Dokumen asli tidak ditemukan di penyimpanan") from exc
+    except storage.StorageError as exc:
+        raise HTTPException(503, str(exc)) from exc
     return Response(content, media_type="application/pdf", headers={
         "Content-Disposition": f'attachment; filename="{filename}"',
         "X-Content-Type-Options": "nosniff",

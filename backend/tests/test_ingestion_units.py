@@ -80,17 +80,20 @@ async def test_fetch_gives_up_on_redirect_loops():
 
 # --- storage -------------------------------------------------------------------------------
 
-def test_storage_round_trip_is_content_addressed(document_storage):
-    key = storage.save(PDF)
+async def test_storage_round_trip_is_content_addressed(document_storage):
+    key = await storage.save(PDF)
 
-    assert storage.save(PDF) == key and len(key) == 64
-    assert storage.load(key) == PDF
+    assert await storage.save(PDF) == key and len(key) == 64
+    assert await storage.load(key) == PDF
+    await storage.delete(key)
+    with pytest.raises(storage.DocumentNotFound):
+        await storage.load(key)
 
 
 @pytest.mark.parametrize("key", ["../../etc/passwd", "a" * 63, "Z" * 64])
-def test_storage_rejects_keys_that_are_not_hashes(key):
+async def test_storage_rejects_keys_that_are_not_hashes(key):
     with pytest.raises(ValueError):
-        storage.load(key)
+        await storage.load(key)
 
 
 # --- extraction ----------------------------------------------------------------------------

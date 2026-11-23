@@ -1,10 +1,11 @@
 BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 
-.PHONY: help db-up db-down db-reset install migrate api web test lint check set-role seed ask-raw eval eval-draft reprocess reindex
+.PHONY: help db-up db-down db-reset install migrate api web test lint check set-role seed ask-raw eval eval-draft reprocess reindex \
+	prod prod-migrate deploy-render-env deploy-render deploy-status deploy-web
 
 help:  ## List available commands
-	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-11s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
 
 db-up:  ## Start PostgreSQL + pgvector (Docker) and wait until it is ready
 	docker compose up -d --wait db
@@ -63,3 +64,25 @@ check:  ## Everything CI runs: lint, all tests (database required), frontend bui
 	cd $(BACKEND) && .venv/bin/ruff check .
 	cd $(BACKEND) && REQUIRE_TEST_DATABASE=1 .venv/bin/pytest -q
 	cd frontend && npm run build
+
+# --- Production: settings from deploy/.env.production (README "Deployment") ------------------------------
+
+PROD := cd $(BACKEND) && .venv/bin/python ../deploy/prodenv.py
+
+prod:  ## Run an app.cli command against production, e.g. make prod CMD="set-role you@x.com admin"
+	$(PROD) .venv/bin/python -m app.cli $(CMD)
+
+prod-migrate:  ## Apply database migrations to production
+	$(PROD) .venv/bin/alembic upgrade head
+
+deploy-render-env:  ## Send the API's secrets to Render, then redeploy
+	cd deploy && ../$(PY) render.py env
+
+deploy-render:  ## Redeploy the API on Render (latest commit of its branch)
+	cd deploy && ../$(PY) render.py deploy
+
+deploy-status:  ## The API's URL and its latest deploys on Render
+	cd deploy && ../$(PY) render.py status
+
+deploy-web:  ## Build and deploy the frontend to Vercel production
+	cd deploy && ../$(PY) vercel.py

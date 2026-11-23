@@ -42,6 +42,9 @@ htmlcov/
 uploads/
 backend/storage/
 
+# Vercel CLI project link (frontend/.vercel)
+.vercel/
+
 # OS and editor files
 .DS_Store
 Thumbs.db

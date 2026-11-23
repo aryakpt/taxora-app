@@ -1,6 +1,8 @@
 import axios, { AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+// Production calls the API on its own origin: Vercel forwards /api/* to the backend (vercel.json), so the
+// session cookie is first-party. Development talks to the local API directly.
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8000' : '')
 
 export class ApiError extends Error {
   constructor(message: string, readonly status?: number) {

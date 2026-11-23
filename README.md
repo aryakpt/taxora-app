@@ -118,6 +118,21 @@ queued ─▶ processing ─▶ review_required ─(reviewer)─▶ approved ─
 - `make ask-raw Q="..."` asks the configured LLM directly, without sources, scope guard, or citation checks, to compare a plain LLM answer with Taxora's.
 - `make reprocess JOB=<id>` re-extracts a document that is still under review with the current extractor. Approved and published versions are never changed.
 
+## Deployment
+
+Free tier: **Vercel** (frontend) → **Render** (API, Docker, Singapore) → **Supabase** (PostgreSQL + pgvector, and Storage for the original PDFs). Vercel forwards `/api/*` to Render (`frontend/vercel.json`), so the browser sees one site and the session cookie stays first-party.
+
+Secrets live only in `deploy/.env.production` (git-ignored; template `deploy/env.production.example`) and in the Render dashboard. The `make` commands below read that file and print only variable names.
+
+1. **Supabase**: create a project (region Singapore; Data API off). Fill `SUPABASE_URL`, a secret API key, the *Session pooler* connection string (with `[YOUR-PASSWORD]` left in) and the database password. Render has no IPv6, so use the pooler, not the direct connection.
+2. **Database**: `make prod-migrate`, then `make prod CMD=prepare-storage` (creates the private `documents` bucket).
+3. **Knowledge**: `make prod CMD=copy-knowledge` copies published regulations with their embeddings and PDFs from the local database (no embedding quota spent; existing rows are skipped). Chunks the local database never embedded are copied without a vector: then `make prod CMD=reindex`.
+4. **API**: Render → New → Blueprint → this repository (`render.yaml`; leave the secret fields empty). Then `make deploy-render-env` sends the secrets and redeploys; `make deploy-status` shows the URL. The first deploy runs the migrations itself (`backend/start.sh`). If the URL is not `https://taxora-api.onrender.com`, update `frontend/vercel.json`.
+5. **Frontend**: `make deploy-web` (links `frontend/` to the Vercel project `VERCEL_PROJECT` on first run). Set `FRONTEND_ORIGIN` to the site's URL and run `make deploy-render-env` again.
+6. **Accounts**: register on the site, then `make prod CMD="set-role you@example.com admin"`. For Google sign-in, add the site's URL to the OAuth client's *Authorized JavaScript origins* and set `GOOGLE_CLIENT_ID`.
+
+Free-plan limits: Render sleeps after 15 minutes without traffic (the next request waits ~1 minute); Supabase pauses a project after a week without activity; the Gemini free tier allows about 1,000 embedding requests a day (one per chat question, one per chunk when ingesting). Rate limits count the visitor's IP from `X-Forwarded-For` (`TRUSTED_PROXY_HOPS=2`: Vercel and Render); a client calling the Render URL directly can still forge it, so the limits are a brake, not a guarantee.
+
 ## Tests and checks
 
 ```bash
