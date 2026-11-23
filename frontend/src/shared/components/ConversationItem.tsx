@@ -3,6 +3,7 @@ import { History, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import type { ConversationSummary } from '../types/tax'
+import { ConfirmDialog } from './ConfirmDialog'
 
 type Mode = 'idle' | 'menu' | 'renaming' | 'confirmDelete'
 
@@ -28,7 +29,7 @@ interface Props {
   onDelete: () => Promise<boolean>
 }
 
-/** One conversation in the sidebar history, with a menu to rename it or delete it (after confirmation). */
+/** One conversation in the sidebar history, with a menu to rename it or delete it (after a confirmation dialog). */
 export function ConversationItem({ item, selected, onOpen, onRename, onDelete }: Props) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>('idle')
@@ -40,7 +41,7 @@ export function ConversationItem({ item, selected, onOpen, onRename, onDelete }:
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({})
 
   useEffect(() => {
-    if (mode !== 'menu' && mode !== 'confirmDelete') return
+    if (mode !== 'menu') return
     const close = (event: MouseEvent | KeyboardEvent) => {
       const inside = (node: Node) => root.current?.contains(node) || menu.current?.contains(node)
       if (event instanceof KeyboardEvent ? event.key === 'Escape' : !inside(event.target as Node)) setMode('idle')
@@ -112,15 +113,17 @@ export function ConversationItem({ item, selected, onOpen, onRename, onDelete }:
 
     {mode === 'menu' && createPortal(<div ref={menu} className="history-menu" role="menu" style={menuStyle}>
       <button role="menuitem" onClick={startRename}><Pencil size={14} />{t('history.rename')}</button>
-      <button role="menuitem" className="danger" onClick={() => show('confirmDelete')}><Trash2 size={14} />{t('history.delete')}</button>
+      <button role="menuitem" className="danger" onClick={() => setMode('confirmDelete')}><Trash2 size={14} />{t('history.delete')}</button>
     </div>, document.body)}
 
-    {mode === 'confirmDelete' && createPortal(<div ref={menu} className="history-menu confirm" role="alertdialog" aria-label={t('history.confirmTitle')} style={menuStyle}>
-      <p>{t('history.confirmText')}</p>
-      <div className="history-confirm-actions">
-        <button className="danger solid" onClick={() => void confirmDelete()} disabled={busy}>{t('history.delete')}</button>
-        <button onClick={() => setMode('idle')} disabled={busy}>{t('history.cancel')}</button>
-      </div>
-    </div>, document.body)}
+    {mode === 'confirmDelete' && <ConfirmDialog
+      danger busy={busy}
+      title={t('history.confirmTitle')}
+      message={t('history.confirmText', { title: item.title })}
+      confirmLabel={t('history.delete')}
+      cancelLabel={t('history.cancel')}
+      onConfirm={() => void confirmDelete()}
+      onCancel={() => setMode('idle')}
+    />}
   </div>
 }
