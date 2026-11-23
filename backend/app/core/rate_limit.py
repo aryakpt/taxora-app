@@ -5,6 +5,8 @@ from collections.abc import Callable
 
 from fastapi import HTTPException, Request
 
+from app.core.config import settings
+
 
 class SlidingWindowLimiter:
     """In-memory sliding-window limiter.
@@ -36,7 +38,13 @@ limiter = SlidingWindowLimiter()
 
 
 def client_ip(request: Request) -> str:
-    # Behind a reverse proxy, run uvicorn with --proxy-headers so request.client is the real client.
+    """The visitor's address. Behind `trusted_proxy_hops` proxies, each appends the address it received the
+    request from to X-Forwarded-For, so the visitor is that many entries from the right; anything further left
+    was sent by the client and can be forged."""
+    hops = settings.trusted_proxy_hops
+    forwarded = [part.strip() for part in request.headers.get("x-forwarded-for", "").split(",") if part.strip()]
+    if hops > 0 and forwarded:
+        return forwarded[max(len(forwarded) - hops, 0)]
     return request.client.host if request.client else "unknown"
 
 

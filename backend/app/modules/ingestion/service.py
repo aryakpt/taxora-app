@@ -99,7 +99,7 @@ async def run_job(job_id: uuid.UUID) -> None:
                 await _index(session, await session.get(IngestionJob, job_id))
         except (sources.SourceRejected, ExtractionError) as exc:
             await _fail(session, job_id, str(exc))
-        except EmbeddingError as exc:  # quota or outage: nothing is stored, retry indexes the document again
+        except (EmbeddingError, storage.StorageError) as exc:  # outage or quota: retry processes it again
             await _fail(session, job_id, f"{exc} Gunakan retry untuk memproses ulang.")
         except Exception:
             logger.exception("ingestion failed job_id=%s", job_id)
@@ -114,7 +114,7 @@ async def _ensure_stored(session: AsyncSession, job_id: uuid.UUID) -> None:
             return
         url = job.source_url
     content, filename = await sources.fetch_pdf(url)
-    key = storage.save(content)
+    key = await storage.save(content)
     async with session.begin():
         job = await session.get(IngestionJob, job_id)
         job.storage_key, job.filename = key, job.filename or filename
@@ -127,7 +127,7 @@ async def _index(session: AsyncSession, job: IngestionJob) -> None:
     if existing and existing.status == JobStatus.rejected.value:
         # The same file again after a rejection (one version per file): extract it afresh and review it again.
         await session.execute(delete(LegalProvision).where(LegalProvision.version_id == existing.id))
-        sections = structural_sections(extract_text(storage.load(job.storage_key)))
+        sections = structural_sections(extract_text(await storage.load(job.storage_key)))
         detail = _summary(len(sections), await _build_provisions(session, existing, sections))
         existing.status, existing.verified_at = JobStatus.review_required.value, None
         await session.execute(update(IngestionJob).where(IngestionJob.version_id == existing.id)
@@ -141,7 +141,7 @@ async def _index(session: AsyncSession, job: IngestionJob) -> None:
         session.add(AuditLog(actor_id=job.requested_by, action="ingestion.duplicate", resource_id=str(job.id)))
         return
 
-    text = extract_text(storage.load(job.storage_key))
+    text = extract_text(await storage.load(job.storage_key))
     sections = structural_sections(text)
     meta = job.metadata_json
     version = RegulationVersion(
@@ -218,7 +218,7 @@ async def reprocess(job_id: uuid.UUID) -> str:
         if not version.storage_key:
             raise InvalidTransition("Dokumen asli tidak tersimpan.")
         await session.execute(delete(LegalProvision).where(LegalProvision.version_id == version.id))
-        sections = structural_sections(extract_text(storage.load(version.storage_key)))
+        sections = structural_sections(extract_text(await storage.load(version.storage_key)))
         detail = _summary(len(sections), await _build_provisions(session, version, sections))
         await session.execute(update(IngestionJob).where(IngestionJob.version_id == version.id).values(detail=detail))
         session.add(AuditLog(actor_id=None, action="ingestion.reprocessed", resource_id=str(job.id)))
@@ -342,7 +342,7 @@ async def delete_document(session: AsyncSession, job_id: uuid.UUID, user: User) 
             await session.scalar(select(func.count()).select_from(RegulationVersion)
                                  .where(RegulationVersion.storage_key == key))
         if not still_used:
-            storage.delete(key)
+            await storage.delete(key)
     session.add(AuditLog(actor_id=user.id, action="ingestion.deleted", resource_id=str(job.id), details=summary))
     return summary
 

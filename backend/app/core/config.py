@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     database_url: str = "postgresql+asyncpg://taxora:taxora@localhost:5432/taxora"
+    # Supabase's session pooler allows ~15 connections on the free plan; keep the pool well under it.
+    database_pool_size: int = 5
+    database_max_overflow: int = 5
     auth_secret_key: str = Field(min_length=32)
     auth_cookie_secure: bool = False
     auth_cookie_name: str = "taxora_session"
@@ -91,7 +94,28 @@ class Settings(BaseSettings):
     ingestion_fetch_timeout_seconds: float = 30
     document_storage_dir: Path = BACKEND_DIR / "storage" / "documents"
     max_upload_bytes: int = 30 * 1024 * 1024
+    # Production: originals go to Supabase Storage instead of the (ephemeral) server disk; see ingestion/storage.py.
+    supabase_url: str = ""
+    supabase_secret_key: str = ""
+    supabase_storage_bucket: str = "documents"
     frontend_origin: str = "http://localhost:5173"
+    # Reverse proxies in front of the API that append to X-Forwarded-For (the frontend's rewrite proxy and the
+    # host's load balancer). 0 = use the TCP peer address (local development). See core/rate_limit.py.
+    trusted_proxy_hops: int = 0
+
+    @model_validator(mode="after")
+    def _production_is_safe(self):
+        if self.app_env == "production":
+            problems = []
+            if not self.auth_cookie_secure:
+                problems.append("AUTH_COOKIE_SECURE must be true (HTTPS)")
+            if "taxora:taxora@" in self.database_url:
+                problems.append("DATABASE_URL still uses the development password")
+            if not (self.supabase_url and self.supabase_secret_key):
+                problems.append("SUPABASE_URL and SUPABASE_SECRET_KEY are required (the server disk is not kept)")
+            if problems:
+                raise ValueError("Unsafe production settings: " + "; ".join(problems))
+        return self
 
 
 settings = Settings()

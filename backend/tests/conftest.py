@@ -75,6 +75,7 @@ def reset_rate_limits():
 def document_storage(tmp_path, monkeypatch):
     """Original documents go to a per-test temporary folder, never to backend/storage."""
     monkeypatch.setattr(settings, "document_storage_dir", tmp_path / "documents")
+    monkeypatch.setattr(settings, "supabase_url", "")  # never Supabase Storage in tests
     return tmp_path / "documents"
 
 
