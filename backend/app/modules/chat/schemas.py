@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 
 
 class AnswerStatus(str, Enum):
-    answered = "answered"
+    answered = "answered"  # backed by quoted regulations
+    general_answer = "general_answer"  # from the model's general knowledge, not verified against regulations
     clarification_needed = "clarification_needed"
     insufficient_evidence = "insufficient_evidence"
     out_of_scope = "out_of_scope"

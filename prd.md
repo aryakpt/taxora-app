@@ -12,6 +12,7 @@
 
 | Versi | Perubahan |
 |---|---|
+| 1.2 | Jawaban pengetahuan umum (FR-02): pertanyaan pajak yang belum tercakup knowledge base tetap dijawab dari pengetahuan umum LLM dengan status `general_answer` dan label "belum diverifikasi", tanpa sumber. Pembatasan hanya pada topik (pertanyaan di luar PPh/PPN ditolak). Mode ketat tetap tersedia lewat konfigurasi. |
 | 1.1 | Menambahkan problem statement dan diferensiasi terhadap LLM umum (§1.5), konsep Modul Pajak/objek pajak sebagai "aturan main" terstruktur (§3.2, FR-15), hierarki sumber hukum (FR-03), tabel `tax_modules` dan `tax_rules` (§6.6–6.7), API modul (§7.6), dan halaman modul pada UI (§12.4). Fokus MVP dipertegas: chatbot LLM-RAG khusus PPh dan PPN. |
 | 1.0 | Draft awal. |
 
@@ -226,12 +227,13 @@ Requirements:
 - Sistem membedakan fakta yang diberikan pengguna dari asumsi.
 - Sistem mengajukan pertanyaan klarifikasi jika informasi penting belum tersedia.
 - Sistem menyatakan keterbatasan jika bukti tidak cukup.
+- Jika knowledge base tidak memuat bukti yang relevan, sistem tetap menjawab pertanyaan pajak dari pengetahuan umum LLM dengan status `general_answer`, label yang jelas bahwa jawaban belum diverifikasi terhadap peraturan, tanpa panel sumber, dan peringatan bahwa tarif, batasan, dan tenggat dapat berubah. Konfigurasi `CHAT_ALLOW_GENERAL_ANSWERS=false` mengembalikan perilaku ketat (hanya jawaban berbasis evidence).
 - Sistem tidak boleh membuat nomor peraturan, pasal, kutipan, atau URL sumber yang tidak terverifikasi.
 - Sistem tidak boleh menyimpulkan bahwa suatu ketentuan berlaku hanya karena ditemukan melalui semantic search.
 
 Acceptance criteria:
 
-- Jawaban substantif memiliki referensi evidence yang valid.
+- Jawaban berstatus `answered` memiliki referensi evidence yang valid; jawaban `general_answer` selalu diberi label belum terverifikasi dan tidak menampilkan sumber.
 - Jawaban tidak mengarang sumber hukum.
 - Ketika sumber tidak mencukupi, sistem menyatakan keterbatasan dan tidak mengarang kesimpulan.
 - Ketika fakta kasus belum mencukupi, sistem meminta klarifikasi yang relevan.
