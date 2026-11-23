@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { AlertTriangle, CheckCircle2, Download, ExternalLink, RotateCcw, Send, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ExtractedSection, IngestionJob } from '../../../shared/types/tax'
-import type { IngestionApi, VersionDates } from '../api/ingestionApi'
+import type { IngestionApi, MetadataCorrection, VersionDates } from '../api/ingestionApi'
 import { jobLabel } from './IngestionJobList'
+import { MetadataCorrectionForm } from './MetadataCorrectionForm'
 
 interface Props {
   job: IngestionJob
@@ -51,6 +52,17 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onError, onClose 
     finally { setBusy(false) }
   }
 
+  async function correct(correction: MetadataCorrection) {
+    try {
+      onChanged(await api.correctMetadata(job.id, correction), t('admin.correction.saved'))
+      return true
+    } catch (error) {
+      onError((error as Error).message)
+      return false
+    }
+  }
+
+  const correctable = isAdmin && !!job.version && (job.status === 'approved' || job.status === 'published')
   const datesChanged = JSON.stringify(dates) !== serverDates
   const setDate = (key: keyof VersionDates, value: string) => setDates(current => ({ ...current, [key]: value || null }))
 
@@ -88,6 +100,8 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onError, onClose 
         ? <button className="secondary-button" disabled={!datesChanged} onClick={() => void run(() => api.updateDates(job.id, dates), t('admin.review.datesSaved'))}>{t('admin.review.saveDates')}</button>
         : <small>{t('admin.review.datesFrozen')}</small>}
     </fieldset>}
+
+    {correctable && <MetadataCorrectionForm key={job.updated_at} job={job} onSubmit={correct} />}
 
     {job.version && <div className="review-sections">
       <h3>{t('admin.review.sections')}{sections && <span> · {t('admin.review.sectionCount', { count: sections.length })}</span>}</h3>

@@ -52,6 +52,7 @@ export interface IngestionJob {
   created_at: string
   updated_at: string
   storage_available: boolean
+  corrections: MetadataCorrectionEntry[]
   regulation: { id: string; type: string; number: string; title: string; issuer: string; topic: string } | null
   version: {
     id: string
@@ -62,6 +63,13 @@ export interface IngestionJob {
     effective_until: string | null
     verified_at: string | null
   } | null
+}
+
+export interface MetadataCorrectionEntry {
+  at: string
+  by: string | null
+  reason: string
+  changes: Record<string, { old: string | null; new: string | null }>
 }
 
 export interface ExtractedSection {

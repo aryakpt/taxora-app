@@ -127,6 +127,45 @@ async def test_reviewer_corrects_dates_only_while_under_review(client, source):
     assert "ingestion.dates_updated" in actions
 
 
+CORRECTION = {"title": "[FIXTURE] Judul yang benar", "issuer": "Kementerian Keuangan", "topic": "PPh",
+              "issued_at": "2026-04-29", "effective_from": "2027-01-01", "effective_until": None,
+              "reason": "Tanggal berlaku keliru, lihat Pasal 2"}
+
+
+async def test_admin_corrects_metadata_of_a_published_document_with_a_reason(client, source):
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client)
+    base = f"/api/v1/admin/ingestion/{job['id']}"
+    assert (await client.put(f"{base}/metadata", json=CORRECTION)).status_code == 409  # still under review
+    await client.post(f"{base}/approve")
+    await client.post(f"{base}/publish")
+    asked = await client.post("/api/v1/chat", json={"question": "Berapa tarif pajak atas sewa?"})
+    assert "dikonfigurasi" in asked.json()["answer"]  # in force: evidence found (LLM not configured)
+
+    corrected = await client.put(f"{base}/metadata", json=CORRECTION)
+
+    assert corrected.status_code == 200, corrected.text
+    body = corrected.json()
+    assert body["status"] == "published"  # stays published
+    assert body["regulation"]["title"] == "[FIXTURE] Judul yang benar"
+    assert body["version"]["effective_from"] == "2027-01-01" and body["version"]["issued_at"] == "2026-04-29"
+    [entry] = body["corrections"]
+    assert entry["reason"] == "Tanggal berlaku keliru, lihat Pasal 2" and entry["by"] == "admin@example.com"
+    assert entry["changes"]["effective_from"] == {"old": "2026-01-01", "new": "2027-01-01"}
+    assert "issuer" in entry["changes"] and "topic" not in entry["changes"]
+    # Retrieval follows the new dates at once: not in force yet, so no evidence.
+    asked = await client.post("/api/v1/chat", json={"question": "Berapa tarif pajak atas sewa?"})
+    assert asked.json()["answer_status"] == "insufficient_evidence" and "dikonfigurasi" not in asked.json()["answer"]
+
+    assert (await client.put(f"{base}/metadata", json=CORRECTION)).status_code == 409  # nothing changed
+    assert (await client.put(f"{base}/metadata", json={**CORRECTION, "reason": "x"})).status_code == 422
+    backwards = {**CORRECTION, "effective_until": "2026-01-01"}
+    assert (await client.put(f"{base}/metadata", json=backwards)).status_code == 422
+
+    await sign_in_as(client, "reviewer@example.com", UserRole.reviewer)
+    assert (await client.put(f"{base}/metadata", json={**CORRECTION, "title": "y"})).status_code == 403
+
+
 async def test_reviewer_can_read_extracted_sections_and_the_original(client, source):
     await sign_in_as(client, "admin@example.com", UserRole.admin)
     job = await submit(client)

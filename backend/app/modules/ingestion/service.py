@@ -22,7 +22,7 @@ from app.modules.generation import providers
 from app.modules.ingestion import sources, storage
 from app.modules.ingestion.extraction import ExtractionError, chunks, extract_text, structural_sections
 from app.modules.ingestion.models import IngestionJob, JobStatus
-from app.modules.ingestion.schemas import RegulationMetadata, VersionDates
+from app.modules.ingestion.schemas import MetadataCorrection, RegulationMetadata, VersionDates
 from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
 logger = logging.getLogger("taxora.ingestion")
@@ -271,6 +271,53 @@ async def update_dates(session: AsyncSession, job_id: uuid.UUID, user: User, dat
     return job
 
 
+CORRECTABLE = (JobStatus.approved.value, JobStatus.published.value)
+CORRECTION_ACTION = "ingestion.metadata_corrected"
+
+
+async def correct_metadata(session: AsyncSession, job_id: uuid.UUID, user: User,
+                           correction: MetadataCorrection) -> IngestionJob:
+    """Fix wrong metadata of an approved or published document, with a reason. Old and new values are kept
+    in the audit log. A published document stays published: retrieval uses the new dates immediately."""
+    job, version = await _job_and_version(session, job_id)
+    if version is None or version.status not in CORRECTABLE:
+        raise InvalidTransition("Koreksi metadata hanya untuk dokumen yang sudah disetujui atau dipublikasikan. "
+                                "Selama ditinjau, ubah tanggal lewat formulir tinjauan.")
+    regulation = await session.get(Regulation, version.regulation_id)
+    wanted = {
+        "title": correction.title.strip(), "issuer": correction.issuer.strip(), "topic": correction.topic,
+        "issued_at": correction.issued_at, "effective_from": correction.effective_from,
+        "effective_until": correction.effective_until,
+    }
+    targets = {"title": regulation, "issuer": regulation, "topic": regulation,
+               "issued_at": version, "effective_from": version, "effective_until": version}
+    changes = {}
+    for field_name, new in wanted.items():
+        old = getattr(targets[field_name], field_name)
+        if old != new:
+            changes[field_name] = {"old": _plain(old), "new": _plain(new)}
+            setattr(targets[field_name], field_name, new)
+    if not changes:
+        raise InvalidTransition("Tidak ada perubahan metadata.")
+    session.add(AuditLog(actor_id=user.id, action=CORRECTION_ACTION, resource_id=str(job.id),
+                         details={"reason": correction.reason.strip(), "changes": changes}))
+    await session.flush()
+    return job
+
+
+def _plain(value):
+    return value.isoformat() if isinstance(value, date) else value
+
+
+async def corrections(session: AsyncSession, job_id: uuid.UUID) -> list[dict]:
+    rows = (await session.execute(
+        select(AuditLog, User.email).outerjoin(User, AuditLog.actor_id == User.id)
+        .where(AuditLog.resource_id == str(job_id), AuditLog.action == CORRECTION_ACTION)
+        .order_by(AuditLog.created_at.desc())
+    )).all()
+    return [{"at": log.created_at, "by": email, **(log.details or {})} for log, email in rows]
+
+
 # --- read models -------------------------------------------------------------------------------
 
 async def describe(session: AsyncSession, job: IngestionJob) -> dict:
@@ -286,6 +333,7 @@ async def describe(session: AsyncSession, job: IngestionJob) -> dict:
         "created_at": job.created_at,
         "updated_at": job.updated_at,
         "storage_available": bool(job.storage_key),
+        "corrections": await corrections(session, job.id),
         "regulation": {"id": regulation.id, "type": regulation.regulation_type,
                        "number": regulation.regulation_number, "title": regulation.title,
                        "issuer": regulation.issuer, "topic": regulation.topic} if regulation else None,

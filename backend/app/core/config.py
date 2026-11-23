@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     auth_login_attempts_per_minute: int = 10
     auth_registrations_per_hour: int = 5
 
-    # LLM: any OpenAI-compatible chat API. Defaults to OpenRouter's free-model router.
+    # LLM: any OpenAI-compatible chat API (OpenRouter by default). Values in backend/.env override these.
     llm_api_key: str = ""
     llm_base_url: str = "https://openrouter.ai/api/v1"
     # Tried in order. A retry (empty, cut-off, or invalid reply) starts at the next model, and on OpenRouter

@@ -8,7 +8,7 @@ from app.core.database import SessionDep
 from app.modules.auth.dependencies import AdminUser, ReviewerUser
 from app.modules.ingestion import service, storage
 from app.modules.ingestion.models import IngestionJob
-from app.modules.ingestion.schemas import RegulationMetadata, UploadForm, VersionDates
+from app.modules.ingestion.schemas import MetadataCorrection, RegulationMetadata, UploadForm, VersionDates
 
 router = APIRouter(prefix="/api/v1/admin/ingestion", tags=["admin"])
 
@@ -112,6 +112,12 @@ async def publish(job_id: uuid.UUID, session: SessionDep, user: AdminUser):
 async def update_dates(job_id: uuid.UUID, body: VersionDates, session: SessionDep, user: ReviewerUser):
     """Set the issued and effective dates while the version is under review."""
     return await _transition(lambda s, j, u: service.update_dates(s, j, u, body), session, job_id, user)
+
+
+@router.put("/{job_id}/metadata")
+async def correct_metadata(job_id: uuid.UUID, body: MetadataCorrection, session: SessionDep, user: AdminUser):
+    """Correct the metadata of an approved or published document (dates, title, issuer, topic), with a reason."""
+    return await _transition(lambda s, j, u: service.correct_metadata(s, j, u, body), session, job_id, user)
 
 
 @router.post("/{job_id}/retry", status_code=status.HTTP_202_ACCEPTED)
