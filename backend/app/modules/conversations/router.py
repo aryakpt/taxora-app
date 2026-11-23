@@ -38,11 +38,24 @@ async def conversation_detail(conversation_id: uuid.UUID, session: SessionDep, u
     messages = (await session.scalars(
         select(Message).where(Message.conversation_id == row.id).order_by(*Message.chronological())
     )).all()
-    return {
-        "id": row.id,
-        "title": row.title,
-        "messages": [{"id": m.id, "role": m.role, "content": m.content, "metadata": m.metadata_json} for m in messages],
-    }
+    return {"id": row.id, "title": row.title, "messages": [_shown(message) for message in messages]}
+
+
+def _shown(message: Message) -> dict:
+    """What the conversation view needs. The rest of the stored trace (model, errors, prompt version, evidence
+    ids) stays on the server. Answers from before sources were stored have no sources to show."""
+    meta = message.metadata_json or {}
+    shown = {"id": message.id, "role": message.role, "content": message.content}
+    if message.role == "assistant":
+        display = meta.get("display") or {}
+        shown |= {
+            "answer_status": meta.get("answer_status"),
+            "sources": display.get("sources", []),
+            "missing_information": display.get("missing_information", []),
+            "limitations": display.get("limitations", []),
+            "latency_ms": meta.get("latency_ms"),
+        }
+    return shown
 
 
 @router.patch("/{conversation_id}")

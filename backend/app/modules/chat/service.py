@@ -94,7 +94,10 @@ async def answer_question(body: ChatRequest, session: AsyncSession, user: User) 
                        "evidence_ids": [str(item["id"]) for item in outcome.evidence],
                        "cited_evidence_ids": [str(s.evidence_id) for s in outcome.sources],
                        "latency_ms": latency_ms, "response_language": body.response_language,
-                       "prompt_version": PROMPT_VERSION, **outcome.trace},
+                       "prompt_version": PROMPT_VERSION, **outcome.trace,
+                       # What the user saw, so a reopened conversation shows the same sources and notes.
+                       "display": {"sources": [source.model_dump(mode="json") for source in outcome.sources],
+                                   "missing_information": outcome.missing, "limitations": outcome.limitations}},
     )
     session.add(answer)
     await session.flush()
