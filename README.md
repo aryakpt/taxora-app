@@ -87,8 +87,17 @@ queued ─▶ processing ─▶ review_required ─(reviewer)─▶ approved ─
   3. **Structured prompt**: the question, case context, and evidence are wrapped in tags and treated as untrusted data; text cannot open or close those tags.
   4. **Citation validation**: a claim is kept only if it cites evidence that was retrieved and quotes it verbatim; sources show the verified passage. If the model declares a question out of scope, its text is discarded.
   5. **Per-user chat limit** (`CHAT_REQUESTS_PER_HOUR`) to protect the shared LLM quota.
-- Thresholds are initial values (the scope threshold was checked on 16 sample questions, the retrieval threshold on 6 questions against one regulation). Re-tune them on the evaluation dataset. These layers reduce, but cannot eliminate, prompt-injection risk; the answer text itself is not checked claim by claim.
-- Each answer stores its prompt version, model, scope decision, retrieved and cited evidence IDs, and latency in message metadata; prompts are not stored.
+- **Follow-up questions**: the last 2 exchanges of a conversation are sent to the LLM inside `<history>` (untrusted, never evidence), and the previous question is added to the scope check and the search, so "lalu apa syaratnya?" keeps its meaning. Out-of-scope turns are never replayed.
+- **LLM reliability**: a reply that is empty, cut off at `LLM_MAX_OUTPUT_TOKENS`, timed out, or not the expected JSON is retried up to `LLM_ATTEMPTS` times. Every free model on OpenRouter is currently a reasoning model (reasoning cannot be switched off there), and measured on 2026-11-23 about half of the replies used the whole budget thinking and returned nothing; `LLM_REASONING_EFFORT=low` helps but does not solve it. A paid model (for example `anthropic/claude-haiku-5.5` on OpenRouter, about $0.0014 per question) avoids this; set `LLM_REASONING_EFFORT=` (empty) for models that do not need it.
+- Thresholds are initial values, calibrated on small samples (scope: 10 tax questions without tax terms vs 15 off-topic ones; retrieval: questions against one regulation). Re-tune them with `make eval` as documents are added. These layers reduce, but cannot eliminate, prompt-injection risk; the answer text itself is not checked claim by claim.
+- Each answer stores its prompt version, the model that actually answered (a router picks one per request), failed attempts, scope decision, history length, retrieved and cited evidence IDs, and latency in message metadata; prompts are not stored.
+
+## Evaluation and baseline
+
+- `make eval` scores the scope guard and retrieval on `backend/app/modules/evaluation/cases/pmk_28_2026.json` (no LLM call, free and repeatable); `make eval-draft` also searches documents still under review. Results are stored in `evaluation_runs` and listed at `GET /api/v1/admin/evaluations`.
+- The dataset's expected articles were labeled from the extracted text and have **not been confirmed by a tax reviewer** (`reviewed_by: null`); treat scores as indicative. Current result on PMK 28/2026: expected article in the top 5 for 10 of 14 questions, all 6 off-topic questions refused.
+- `make ask-raw Q="..."` asks the configured LLM directly, without sources, scope guard, or citation checks, to compare a plain LLM answer with Taxora's.
+- `make reprocess JOB=<id>` re-extracts a document that is still under review with the current extractor. Approved and published versions are never changed.
 
 ## Tests and checks
 

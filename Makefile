@@ -1,10 +1,10 @@
 BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 
-.PHONY: help db-up db-down db-reset install migrate api web test lint set-role seed
+.PHONY: help db-up db-down db-reset install migrate api web test lint set-role seed ask-raw eval eval-draft reprocess
 
 help:  ## List available commands
-	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-11s %s\n", $$1, $$2}'
 
 db-up:  ## Start PostgreSQL + pgvector (Docker) and wait until it is ready
 	docker compose up -d --wait db
@@ -38,6 +38,20 @@ set-role:  ## Change a user's role, e.g. make set-role EMAIL=you@example.com ROL
 
 seed:  ## Create dev accounts (admin/reviewer/user@example.com); refuses when APP_ENV=production
 	cd $(BACKEND) && .venv/bin/python -m app.cli seed-dev-users
+
+ask-raw:  ## Ask the LLM directly, without sources or guards (baseline): make ask-raw Q="..."
+	@test -n "$(Q)" || (echo 'usage: make ask-raw Q="pertanyaan"' && exit 1)
+	cd $(BACKEND) && .venv/bin/python -m app.cli ask-raw "$(Q)"
+
+eval:  ## Score scope guard + retrieval on the evaluation dataset (published documents)
+	cd $(BACKEND) && .venv/bin/python -m app.cli eval-retrieval
+
+eval-draft:  ## Same, also searching documents still under review
+	cd $(BACKEND) && .venv/bin/python -m app.cli eval-retrieval --include-unreviewed
+
+reprocess:  ## Re-extract a document still under review with the current extractor: make reprocess JOB=<id>
+	@test -n "$(JOB)" || (echo 'usage: make reprocess JOB=<job id>' && exit 1)
+	cd $(BACKEND) && .venv/bin/python -m app.cli reprocess "$(JOB)"
 
 lint:  ## Lint backend code
 	cd $(BACKEND) && .venv/bin/ruff check app tests

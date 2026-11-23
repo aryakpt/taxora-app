@@ -149,6 +149,26 @@ async def test_reviewer_can_read_extracted_sections_and_the_original(client, sou
     assert (await client.get(f"{base}/document")).status_code == 403
 
 
+async def test_documents_under_review_can_be_reprocessed_but_approved_ones_cannot(client, source):
+    from app.modules.ingestion import service
+
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client)
+    async with SessionLocal() as session:
+        before = set((await session.scalars(select(LegalProvision.id))).all())
+
+    detail = await service.reprocess(job["id"])
+
+    async with SessionLocal() as session:
+        after = set((await session.scalars(select(LegalProvision.id))).all())
+    assert detail.startswith("3 bagian") and len(after) == 3 and not before & after  # rebuilt
+    assert await count(DocumentChunk) == 3  # old chunks went with their provisions
+
+    await client.post(f"/api/v1/admin/ingestion/{job['id']}/approve")
+    with pytest.raises(service.InvalidTransition):
+        await service.reprocess(job["id"])
+
+
 async def test_only_admins_submit_and_regular_users_see_nothing(client, source):
     await sign_in_as(client, "user@example.com", UserRole.user)
     assert (await client.post("/api/v1/admin/ingestion", json=METADATA)).status_code == 403

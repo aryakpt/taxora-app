@@ -11,7 +11,7 @@ import logging
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -140,6 +140,14 @@ async def _index(session: AsyncSession, job: IngestionJob) -> None:
     session.add(version)
     await session.flush()
 
+    piece_count = await _build_provisions(session, version, sections)
+    job.version_id, job.status = version.id, JobStatus.review_required.value
+    job.detail = _summary(len(sections), piece_count)
+    session.add(AuditLog(actor_id=job.requested_by, action="ingestion.processed", resource_id=str(job.id)))
+
+
+async def _build_provisions(session: AsyncSession, version: RegulationVersion, sections: list) -> int:
+    """Store sections as provisions and their chunks with embeddings. Returns the number of chunks."""
     pieces: list[tuple[LegalProvision, str]] = []
     for ordinal, section in enumerate(sections):
         provision = LegalProvision(version_id=version.id, provision_type=section.kind,
@@ -152,9 +160,28 @@ async def _index(session: AsyncSession, job: IngestionJob) -> None:
         DocumentChunk(provision_id=provision.id, chunk_text=piece, token_count=len(piece.split()), embedding=vector)
         for (provision, piece), vector in zip(pieces, vectors, strict=True)
     )
-    job.version_id, job.status = version.id, JobStatus.review_required.value
-    job.detail = f"{len(sections)} bagian diekstrak, {len(pieces)} potongan diindeks."
-    session.add(AuditLog(actor_id=job.requested_by, action="ingestion.processed", resource_id=str(job.id)))
+    return len(pieces)
+
+
+def _summary(sections: int, pieces: int) -> str:
+    return f"{sections} bagian diekstrak, {pieces} potongan diindeks."
+
+
+async def reprocess(job_id: uuid.UUID) -> str:
+    """Re-extract and re-index a version that is still under review, from the stored original. Used after
+    the extractor improves. Approved or published versions are never changed: approval covers their text."""
+    async with SessionLocal() as session, session.begin():
+        job, version = await _job_and_version(session, job_id)
+        if version is None or version.status != JobStatus.review_required.value:
+            raise InvalidTransition("Hanya dokumen berstatus review_required yang bisa diproses ulang.")
+        if not version.storage_key:
+            raise InvalidTransition("Dokumen asli tidak tersimpan.")
+        await session.execute(delete(LegalProvision).where(LegalProvision.version_id == version.id))
+        sections = structural_sections(extract_text(storage.load(version.storage_key)))
+        detail = _summary(len(sections), await _build_provisions(session, version, sections))
+        await session.execute(update(IngestionJob).where(IngestionJob.version_id == version.id).values(detail=detail))
+        session.add(AuditLog(actor_id=None, action="ingestion.reprocessed", resource_id=str(job.id)))
+    return detail
 
 
 async def _fail(session: AsyncSession, job_id: uuid.UUID, message: str) -> None:
