@@ -4,12 +4,13 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '../AuthProvider'
 import { LanguageSwitcher } from '../../components/LanguageSwitcher'
 import { ApiError } from '../../api/client'
+import { GoogleSignInButton } from '../components/GoogleSignInButton'
 
 type Mode = 'login' | 'register'
 
 export function AuthPage() {
   const { t } = useTranslation()
-  const { signIn, signUp } = useAuth()
+  const { signIn, signUp, signInWithGoogle } = useAuth()
   const [mode, setMode] = useState<Mode>('login')
   const [email, setEmail] = useState('')
   const [fullName, setFullName] = useState('')
@@ -37,6 +38,16 @@ export function AuthPage() {
     finally { setBusy(false) }
   }
 
+  async function google(credential: string) {
+    setError('')
+    setBusy(true)
+    try { await signInWithGoogle(credential) }
+    catch (cause) {
+      setError(cause instanceof ApiError && cause.status === 409 ? t('auth.googleEmailTaken') : t('auth.googleFailed'))
+    }
+    finally { setBusy(false) }
+  }
+
   function toggleMode() {
     setMode(mode === 'login' ? 'register' : 'login')
     setError('')
@@ -49,6 +60,8 @@ export function AuthPage() {
       <p className="auth-eyebrow"><ShieldCheck size={13} /> {t('auth.secureAccount')}</p>
       <h1 id="auth-title">{t(mode === 'login' ? 'auth.loginTitle' : 'auth.registerTitle')}</h1>
       <p className="auth-description">{t(mode === 'login' ? 'auth.loginDescription' : 'auth.registerDescription')}</p>
+
+      <GoogleSignInButton onCredential={credential => void google(credential)} />
 
       <form className="auth-form" onSubmit={submit}>
         {mode === 'register' && <label>{t('auth.fullName')}<input autoComplete="name" value={fullName} onChange={event => setFullName(event.target.value)} required maxLength={150} /></label>}

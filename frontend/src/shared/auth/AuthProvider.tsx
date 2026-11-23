@@ -6,6 +6,7 @@ export interface AuthUser {
   email: string | null
   full_name: string | null
   role: string
+  avatar_url?: string | null
 }
 
 /** Reviewers check extracted documents; admins can also submit and publish them. */
@@ -21,6 +22,7 @@ interface AuthContextValue {
   loading: boolean
   signIn: (credentials: Credentials) => Promise<void>
   signUp: (details: Registration) => Promise<void>
+  signInWithGoogle: (credential: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -48,12 +50,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(account)
   }, [request])
 
+  const signInWithGoogle = useCallback(async (credential: string) => {
+    const account = await request<AuthUser>('/api/v1/auth/google', { method: 'POST', data: { credential } })
+    setUser(account)
+  }, [request])
+
   const signOut = useCallback(async () => {
     try { await request<void>('/api/v1/auth/logout', { method: 'POST' }) }
     finally { setUser(null) }
   }, [request])
 
-  const value = useMemo(() => ({ user, loading, signIn, signUp, signOut }), [user, loading, signIn, signUp, signOut])
+  const value = useMemo(() => ({ user, loading, signIn, signUp, signInWithGoogle, signOut }),
+    [user, loading, signIn, signUp, signInWithGoogle, signOut])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

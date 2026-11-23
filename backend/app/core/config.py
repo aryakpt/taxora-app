@@ -22,6 +22,9 @@ class Settings(BaseSettings):
     # Per client IP; see app/core/rate_limit.py for the single-process limitation.
     auth_login_attempts_per_minute: int = 10
     auth_registrations_per_hour: int = 5
+    # "Sign in with Google": the OAuth client ID from Google Cloud Console (no secret needed). Empty hides
+    # the button. The frontend reads it from GET /api/v1/auth/providers.
+    google_client_id: str = ""
 
     # LLM: any OpenAI-compatible chat API (OpenRouter by default). Values in backend/.env override these.
     llm_api_key: str = ""
