@@ -117,13 +117,14 @@ async def reprocess(job_id: str) -> str:
         raise CommandError(str(exc)) from exc
 
 
-async def eval_retrieval(include_unreviewed: bool) -> dict:
+async def eval_retrieval(include_unreviewed: bool) -> list[dict]:
+    """Every dataset in app/modules/evaluation/cases/."""
     from app.modules.evaluation import retrieval
     from app.modules.generation import providers
 
     async with SessionLocal() as session, session.begin():
-        return await retrieval.run(session, retrieval.load(), providers.get_embedder(),
-                                   include_unreviewed=include_unreviewed)
+        return [await retrieval.run(session, dataset, providers.get_embedder(), include_unreviewed=include_unreviewed)
+                for dataset in retrieval.load_all()]
 
 
 def print_evaluation(summary: dict) -> None:
@@ -186,7 +187,9 @@ def main(argv: list[str] | None = None) -> int:
         model, answer = result
         print(f"[{model}] — no sources, no checks\n\n{answer}")
     elif args.command == "eval-retrieval":
-        print_evaluation(result)
+        for summary in result:
+            print_evaluation(summary)
+            print()
     else:
         for email, role, outcome in result:
             print(f"{outcome:>8}  {role:<9} {email}")
