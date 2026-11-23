@@ -28,7 +28,7 @@ export function AppSidebar({ activeConversation, conversations, user, mobileOpen
   return <>
     <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="brand"><div className="brand-mark"><span /></div><span className="brand-name">taxora</span><button aria-label={t('navigation.closeNavigation')} className="icon-btn mobile-close" onClick={onCloseMobile}><X size={18} /></button></div>
-      <button className="new-chat" onClick={onNewChat}><SquarePen size={16} aria-hidden="true" /><span>{t('navigation.newConversation')}</span></button>
+      <button className="new-chat" onClick={onNewChat}><SquarePen size={17} aria-hidden="true" /><span>{t('navigation.newConversation')}</span></button>
       <div className="nav-label">{t('navigation.workspace')}</div>
       <nav className="primary-nav" aria-label={t('navigation.workspace')}>
         <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}><Sparkles size={17} /><span>{t('navigation.taxAssistant')}</span></NavLink>

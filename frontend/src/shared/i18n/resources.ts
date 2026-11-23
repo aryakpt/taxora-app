@@ -1,6 +1,6 @@
 const en = {
   language: { select: 'Select language', english: 'English', indonesian: 'Bahasa Indonesia' },
-  common: { documentTitle: 'Taxora — Tax, made clearer', close: 'Close', workspace: 'Workspace', secureWorkspace: 'Secure workspace', help: 'Help', loading: 'Loading…', published: 'Published', originalSource: 'Original source', refresh: 'Refresh' },
+  common: { documentTitle: 'Taxora — Tax, made clearer', close: 'Close', workspace: 'Workspace', help: 'Help', loading: 'Loading…', published: 'Published', originalSource: 'Original source', refresh: 'Refresh' },
   navigation: {
     resizeSidebar: 'Resize sidebar', resizeSidebarHint: 'Drag to resize, double-click to reset', closeNavigation: 'Close navigation', openNavigation: 'Open navigation', toggleSidebar: 'Toggle sidebar', newConversation: 'New consultation', workspace: 'WORKSPACE', taxAssistant: 'Tax assistant', regulationLibrary: 'Regulation library', knowledgeAdmin: 'Knowledge admin', recent: 'RECENT', searchConversations: 'Search conversations', emptyHistory: 'Your consultations will appear here.', evidenceFirst: 'Evidence-first answers', sourcesToVerify: 'Sources you can verify.', signOut: 'Sign out', signedIn: 'Signed in',
   },
@@ -56,7 +56,7 @@ type TranslationShape<T> = {
 
 const id: TranslationShape<typeof en> = {
   language: { select: 'Pilih bahasa', english: 'English', indonesian: 'Bahasa Indonesia' },
-  common: { documentTitle: 'Taxora — Pajak lebih mudah dipahami', close: 'Tutup', workspace: 'Ruang kerja', secureWorkspace: 'Ruang kerja aman', help: 'Bantuan', loading: 'Memuat…', published: 'Dipublikasikan', originalSource: 'Sumber asli', refresh: 'Muat ulang' },
+  common: { documentTitle: 'Taxora — Pajak lebih mudah dipahami', close: 'Tutup', workspace: 'Ruang kerja', help: 'Bantuan', loading: 'Memuat…', published: 'Dipublikasikan', originalSource: 'Sumber asli', refresh: 'Muat ulang' },
   navigation: {
     resizeSidebar: 'Ubah lebar sidebar', resizeSidebarHint: 'Tarik untuk mengubah lebar, klik dua kali untuk mengembalikan', closeNavigation: 'Tutup navigasi', openNavigation: 'Buka navigasi', toggleSidebar: 'Tampilkan/sembunyikan sidebar', newConversation: 'Konsultasi baru', workspace: 'RUANG KERJA', taxAssistant: 'Asisten pajak', regulationLibrary: 'Pustaka peraturan', knowledgeAdmin: 'Admin knowledge base', recent: 'TERBARU', searchConversations: 'Cari percakapan', emptyHistory: 'Percakapan Anda akan muncul di sini.', evidenceFirst: 'Jawaban berbasis bukti', sourcesToVerify: 'Sumber yang dapat diverifikasi.', signOut: 'Keluar', signedIn: 'Sudah masuk',
   },
