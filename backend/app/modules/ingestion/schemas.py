@@ -61,6 +61,16 @@ class VersionDates(BaseModel):
         return self
 
 
+class MetadataCorrection(VersionDates):
+    """An admin's correction of an approved or published document. The legal text cannot be changed this
+    way, and neither can the regulation's type and number (they identify it: re-submit instead)."""
+
+    title: str = Field(min_length=1, max_length=1000)
+    issuer: str = Field(min_length=1, max_length=200)
+    topic: Literal["PPh", "PPN", "other"]
+    reason: str = Field(min_length=5, max_length=500, description="Why the correction is needed; kept in the audit log.")
+
+
 class UploadForm(RegulationMetadata):
     """Multipart form for uploads: the metadata fields plus the PDF itself."""
 

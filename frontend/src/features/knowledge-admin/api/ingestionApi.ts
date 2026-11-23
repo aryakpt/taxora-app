@@ -23,6 +23,13 @@ export interface VersionDates {
   effective_until: string | null
 }
 
+export interface MetadataCorrection extends VersionDates {
+  title: string
+  issuer: string
+  topic: RegulationMetadata['topic']
+  reason: string
+}
+
 export function createIngestionApi(request: ApiRequest) {
   const action = (id: string, name: 'approve' | 'publish' | 'retry') =>
     request<IngestionJob>(`${BASE}/${id}/${name}`, { method: 'POST' })
@@ -38,6 +45,8 @@ export function createIngestionApi(request: ApiRequest) {
     },
     provisions: (id: string) => request<ExtractedSection[]>(`${BASE}/${id}/provisions`),
     updateDates: (id: string, dates: VersionDates) => request<IngestionJob>(`${BASE}/${id}/dates`, { method: 'PUT', data: dates }),
+    correctMetadata: (id: string, correction: MetadataCorrection) =>
+      request<IngestionJob>(`${BASE}/${id}/metadata`, { method: 'PUT', data: correction }),
     approve: (id: string) => action(id, 'approve'),
     publish: (id: string) => action(id, 'publish'),
     retry: (id: string) => action(id, 'retry'),

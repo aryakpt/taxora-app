@@ -247,6 +247,54 @@
 
 .muted { margin: 0; font-size: 11px; color: $color-muted; }
 
+.correction {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid $color-border;
+  border-radius: $radius-control;
+
+  h3 { margin: 0; font-size: 12px; color: #3e5147; }
+}
+
+.correction-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $space-3;
+}
+
+.correction-form {
+  display: grid;
+  gap: 12px;
+
+  label { display: grid; gap: 6px; font-size: 10px; font-weight: 600; color: #5c6b62; }
+
+  input, select, textarea {
+    border: 1px solid #e0e5e1;
+    border-radius: 5px;
+    padding: 0 10px;
+    background: $color-surface;
+    color: #46554c;
+    font-size: 11px;
+  }
+
+  input, select { height: 35px; }
+  textarea { padding: 8px 10px; resize: vertical; font-family: inherit; }
+}
+
+.correction-actions { display: flex; align-items: center; gap: 12px; }
+
+.correction-history {
+  h4 { margin: 4px 0 6px; display: flex; align-items: center; gap: 5px; font-size: 11px; color: #3e5147; }
+  > ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  > ul > li { padding: 8px 10px; border-radius: 5px; background: $color-canvas; font-size: 11px; }
+  ul ul { margin: 4px 0 0; padding-left: 16px; color: $color-ink; }
+}
+
+.correction-meta { color: $color-muted; font-size: 10px; }
+.correction-reason { margin-top: 3px; color: $color-ink; font-style: italic; }
+
 @media (max-width: 640px) {
   .form-grid, .form-grid.three { grid-template-columns: 1fr; }
   .review-facts { grid-template-columns: 1fr; gap: 2px; }
