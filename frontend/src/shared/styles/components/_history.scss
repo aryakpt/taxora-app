@@ -1,0 +1,111 @@
+// Sidebar conversation history: each entry has a "more" button with rename and delete.
+@use '../abstracts/tokens' as *;
+
+// Long titles are cut with an ellipsis; without min-width: 0 a grid item grows to its content and the
+// list scrolls sideways, hiding the icons.
+.history-list { overflow-x: hidden; }
+
+.history-entry {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+
+  .history-item { flex: 1; min-width: 0; padding-right: 30px; }
+  &:hover .history-item, &.selected .history-item, &.active .history-item { background: #eef0f1; }
+}
+
+.history-more {
+  position: absolute;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #87919a;
+  opacity: 0;
+  transition: opacity $motion-fast;
+
+  &:hover { background: #e2e6e8; color: $color-ink; }
+  &:focus-visible { opacity: 1; }
+}
+
+// Visible on hover, on the open conversation, and while its menu is open; always on touch screens.
+.history-entry:hover .history-more,
+.history-entry.selected .history-more,
+.history-entry.active .history-more { opacity: 1; }
+
+@media (hover: none) { .history-more { opacity: 1; } }
+
+.history-menu {
+  position: fixed; // placed by ConversationItem against the viewport, see placeNear()
+  z-index: 20;
+  min-width: 150px;
+  padding: 4px;
+  border: 1px solid $color-border;
+  border-radius: 8px;
+  background: $color-surface;
+  box-shadow: 0 10px 30px #182b3a1f;
+
+  > button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    font-size: 12px;
+    color: $color-ink;
+    text-align: left;
+
+    &:hover { background: #f4f5f6; }
+  }
+
+  .danger { color: #9b514a; }
+  > .danger:hover { background: #fbefee; }
+
+  &.confirm { width: 220px; padding: 10px; }
+  &.confirm p { margin: 0 0 10px; font-size: 11px; line-height: 1.5; color: $color-ink; }
+}
+
+.history-confirm-actions {
+  display: flex;
+  gap: 6px;
+
+  button {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid $color-border;
+    border-radius: 5px;
+    background: $color-surface;
+    font-size: 11px;
+    font-weight: 600;
+    color: $color-ink;
+  }
+
+  .solid { border-color: #b4574e; background: #b4574e; color: white; }
+  .solid:hover { background: #9b4a42; }
+  button:disabled { opacity: .6; cursor: not-allowed; }
+}
+
+.history-item.editing {
+  input {
+    flex: 1;
+    min-width: 0;
+    height: 24px;
+    padding: 0 6px;
+    border: 1px solid $color-focus;
+    border-radius: 4px;
+    background: $color-surface;
+    font: inherit;
+    font-size: 11px;
+    color: $color-ink;
+    outline: none;
+  }
+}
