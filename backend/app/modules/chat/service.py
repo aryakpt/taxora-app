@@ -19,7 +19,7 @@ from app.modules.generation.llm import LLMClient, LLMError, Overloaded, QuotaExh
 from app.modules.generation.prompts import PROMPT_VERSION, Turn, system_prompt, user_prompt
 from app.modules.query_understanding.language import detect_language
 from app.modules.query_understanding.period import reference_date
-from app.modules.query_understanding.scope import assess_scope
+from app.modules.query_understanding.scope import ScopeDecision, assess_scope
 from app.modules.retrieval.service import hybrid_search
 
 logger = logging.getLogger("taxora.chat")
@@ -61,8 +61,11 @@ CHAT_COPY = {
 }
 
 
-# Earlier exchanges sent with a follow-up question, so "and the requirements?" can be resolved.
+# Earlier exchanges sent with a follow-up question, so "and the requirements?" can be resolved. They are
+# picked from the last HISTORY_SCAN_MESSAGES messages after out-of-scope turns are dropped, so a refused
+# "halo" does not push the tax question it interrupted out of the window.
 HISTORY_EXCHANGES = 2
+HISTORY_SCAN_MESSAGES = 20
 
 
 @dataclass
@@ -122,22 +125,36 @@ async def _conversation_for(body: ChatRequest, session: AsyncSession, user: User
 
 
 async def _history(session: AsyncSession, conversation_id: uuid.UUID) -> list[Turn]:
-    """The last exchanges of the conversation, oldest first. Out-of-scope turns are left out, so an injected
-    question is never replayed into later prompts. Failed or unanswered turns stay: their question still
-    gives a follow-up its meaning, and their answer is one of Taxora's fixed messages."""
+    """The last in-scope exchanges of the conversation, oldest first, with what each answer asked the user to
+    clarify. Out-of-scope turns are left out, so an injected question is never replayed into later prompts.
+    Failed or unanswered turns stay: their question still gives a follow-up its meaning, and their answer is
+    one of Taxora's fixed messages."""
     rows = (await session.scalars(
         select(Message).where(Message.conversation_id == conversation_id)
-        .order_by(*Message.chronological(newest_first=True)).limit(HISTORY_EXCHANGES * 2)
+        .order_by(*Message.chronological(newest_first=True)).limit(HISTORY_SCAN_MESSAGES)
     )).all()
     turns, pending_answer = [], None
     for message in rows:  # newest first: each assistant message precedes its question
         if message.role == "assistant":
             pending_answer = message
         elif pending_answer is not None:
-            if pending_answer.metadata_json.get("answer_status") != "out_of_scope":
-                turns.append(Turn(question=message.content, answer=pending_answer.content))
+            meta = pending_answer.metadata_json or {}
+            if meta.get("answer_status") != "out_of_scope":
+                missing = (meta.get("display") or {}).get("missing_information") or []
+                turns.append(Turn(question=message.content, answer=pending_answer.content, missing=tuple(missing)))
+                if len(turns) == HISTORY_EXCHANGES:
+                    break
             pending_answer = None
     return list(reversed(turns))
+
+
+def _search_text(question: str, history: list[Turn]) -> str:
+    """What the follow-up means: the earlier questions, what Taxora asked to clarify, then the new message.
+    "belum kawin dan gaji tetap" alone matches nothing; after "gaji 8 juta, PPh 21?" it is about PTKP."""
+    parts = [turn.question for turn in history]
+    if history and history[-1].missing:
+        parts.append("; ".join(history[-1].missing))
+    return "\n".join([*parts, question])
 
 
 async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_id: uuid.UUID,
@@ -145,8 +162,8 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
     """Scope guard → retrieval → LLM → citation validation. Each step can stop early."""
     copy = CHAT_COPY[body.response_language]
     embedder = providers.get_embedder()
-    # A follow-up ("bagaimana syaratnya?") is judged and searched together with the previous question.
-    search_text = f"{history[-1].question}\n{body.question}" if history else body.question
+    # A follow-up ("bagaimana syaratnya?") is searched together with the earlier questions of the conversation.
+    search_text = _search_text(body.question, history)
     try:
         return await _decide_with_embeddings(body, session, user, request_id, history, search_text, embedder, copy)
     except EmbeddingError as exc:
@@ -156,7 +173,13 @@ async def _decide(body: ChatRequest, session: AsyncSession, user: User, request_
 
 async def _decide_with_embeddings(body: ChatRequest, session: AsyncSession, user: User, request_id: uuid.UUID,
                                   history: list[Turn], search_text: str, embedder, copy: dict) -> Outcome:
-    scope = await assess_scope(search_text, embedder)
+    if history:
+        # The conversation already has an in-scope tax question (out-of-scope turns never enter the history),
+        # so a short reply such as "belum kawin, gaji tetap" continues it. The LLM still judges each message
+        # and answers out_of_scope for an unrelated one ("in_scope": false).
+        scope = ScopeDecision(True, "follow_up")
+    else:
+        scope = await assess_scope(search_text, embedder)
     trace = {"scope": {"in_scope": scope.in_scope, "reason": scope.reason, "similarity": scope.similarity},
              "history_turns": len(history)}
     if not scope.in_scope:
