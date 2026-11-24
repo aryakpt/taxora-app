@@ -1,3 +1,5 @@
+@use '../abstracts/tokens' as *;
+
 // Comfortable reading scale for the consultation UI. Loaded after legacy rules to
 // override the original compact dashboard sizing without changing its layout.
 body,
@@ -5,95 +7,95 @@ button,
 input,
 textarea,
 select {
-  font-size: 16px;
+  font-size: var(--font-size-lg);
 }
 
-.nav-item { font-size: 14px; }
+.nav-item { font-size: var(--font-size-md); }
 .nav-label,
-.history-heading { font-size: 11px; }
-.history-item { font-size: 13px; }
-.history-empty { font-size: 12px; }
-.privacy-note strong { font-size: 12px; }
-.privacy-note span { font-size: 11px; }
-.profile-copy strong { font-size: 12px; }
-.profile-copy small { font-size: 11px; }
+.history-heading { font-size: var(--font-size-xs); }
+.history-item { font-size: var(--font-size-sm); }
+.history-empty { font-size: var(--font-size-xs); }
+.privacy-note strong { font-size: var(--font-size-xs); }
+.privacy-note span { font-size: var(--font-size-xs); }
+.profile-copy strong { font-size: var(--font-size-xs); }
+.profile-copy small { font-size: var(--font-size-xs); }
 
 .breadcrumb,
 .crumb-sep,
-.breadcrumb-current { font-size: 12px; }
-.secure-label { font-size: 11px; }
+.breadcrumb-current { font-size: var(--font-size-xs); }
+.secure-label { font-size: var(--font-size-xs); }
 
 .welcome-eyebrow,
 .prompt-heading,
-.prompt-hint { font-size: 11px; }
-.welcome-subtitle { font-size: 15px; }
-.trust-chips span { font-size: 11px; }
-.suggestion-label { font-size: 13px; }
-.suggestion-text { font-size: 12px; }
-.welcome-disclaimer { font-size: 11px; }
+.prompt-hint { font-size: var(--font-size-xs); }
+.welcome-subtitle { font-size: var(--font-size-base); }
+.trust-chips span { font-size: var(--font-size-xs); }
+.suggestion-label { font-size: var(--font-size-sm); }
+.suggestion-text { font-size: var(--font-size-xs); }
+.welcome-disclaimer { font-size: var(--font-size-xs); }
 
-.context-field { font-size: 11px; }
+.context-field { font-size: var(--font-size-xs); }
 .context-field input,
-.context-field select { font-size: 12px; }
-.context-caption { font-size: 11px; }
-.composer-box textarea { font-size: 15px; }
+.context-field select { font-size: var(--font-size-xs); }
+.context-caption { font-size: var(--font-size-xs); }
+.composer-box textarea { font-size: var(--font-size-base); }
 .composer-hint,
-.send-button { font-size: 12px; }
-.composer-disclaimer { font-size: 11px; }
+.send-button { font-size: var(--font-size-xs); }
+.composer-disclaimer { font-size: var(--font-size-xs); }
 
-.message-meta strong { font-size: 13px; }
-.ai-badge { font-size: 10px; }
-.message-content { font-size: 15px; }
+.message-meta strong { font-size: var(--font-size-sm); }
+.ai-badge { font-size: var(--font-size-xs); }
+.message-content { font-size: var(--font-size-base); }
 .answer-status,
 .answer-note,
-.answer-note strong { font-size: 12px; }
-.source-count { font-size: 11px; }
+.answer-note strong { font-size: var(--font-size-xs); }
+.source-count { font-size: var(--font-size-xs); }
 .source-type,
-.verification { font-size: 10px; }
-.source-name { font-size: 13px; }
-.source-article { font-size: 11px; }
-.source-card blockquote { font-size: 14px; }
-.source-bottom { font-size: 10px; }
+.verification { font-size: var(--font-size-xs); }
+.source-name { font-size: var(--font-size-sm); }
+.source-article { font-size: var(--font-size-xs); }
+.source-card blockquote { font-size: var(--font-size-md); }
+.source-bottom { font-size: var(--font-size-xs); }
 
-.page-kicker { font-size: 11px; }
-.page-intro { font-size: 14px; }
+.page-kicker { font-size: var(--font-size-xs); }
+.page-intro { font-size: var(--font-size-md); }
 .regulation-meta,
 .published-tag,
-.outline-link { font-size: 11px; }
-.regulation-copy h2 { font-size: 19px; }
-.empty-panel p { font-size: 12px; }
+.outline-link { font-size: var(--font-size-xs); }
+.regulation-copy h2 { font-size: var(--font-size-2xl); }
+.empty-panel p { font-size: var(--font-size-xs); }
 .ingest-form label,
-.settings-modal label { font-size: 12px; }
+.settings-modal label { font-size: var(--font-size-xs); }
 .ingest-form > p,
 .job-row strong,
-.text-button { font-size: 12px; }
-.job-row span { font-size: 11px; }
-.jobs-heading h2 { font-size: 15px; }
-.job-status { font-size: 11px !important; }
-.settings-modal > p { font-size: 13px; }
-.token-note { font-size: 11px; }
+.text-button { font-size: var(--font-size-xs); }
+.job-row span { font-size: var(--font-size-xs); }
+.jobs-heading h2 { font-size: var(--font-size-base); }
+.job-status { font-size: var(--font-size-xs) !important; }
+.settings-modal > p { font-size: var(--font-size-sm); }
+.token-note { font-size: var(--font-size-xs); }
 
-.language-switcher select { font-size: 12px; }
+.language-switcher select { font-size: var(--font-size-xs); }
 
-@media (max-width: 540px) {
+@include below('sm') {
   .breadcrumb,
   .crumb-sep,
-  .breadcrumb-current { font-size: 11px; }
-  .welcome-subtitle { font-size: 14px; }
-  .trust-chips span { font-size: 10px; }
-  .suggestion-label { font-size: 12px; }
-  .suggestion-text { font-size: 11px; }
-  .welcome-disclaimer { font-size: 10px; }
-  .context-field { font-size: 10px; }
+  .breadcrumb-current { font-size: var(--font-size-xs); }
+  .welcome-subtitle { font-size: var(--font-size-md); }
+  .trust-chips span { font-size: var(--font-size-xs); }
+  .suggestion-label { font-size: var(--font-size-xs); }
+  .suggestion-text { font-size: var(--font-size-xs); }
+  .welcome-disclaimer { font-size: var(--font-size-xs); }
+  .context-field { font-size: var(--font-size-xs); }
   .context-field input,
-  .context-field select { font-size: 11px; }
-  .composer-box textarea { font-size: 14px; }
+  .context-field select { font-size: var(--font-size-xs); }
+  .composer-box textarea { font-size: var(--font-size-md); }
   .composer-hint,
-  .send-button { font-size: 11px; }
-  .message-content { font-size: 14px; }
-  .source-name { font-size: 12px; }
-  .source-bottom { font-size: 9px; }
+  .send-button { font-size: var(--font-size-xs); }
+  .message-content { font-size: var(--font-size-md); }
+  .source-name { font-size: var(--font-size-xs); }
+  .source-bottom { font-size: var(--font-size-xs); }
   .outline-link { font-size: 0; }
-  .page-intro { font-size: 13px; }
-  .regulation-copy h2 { font-size: 16px; }
+  .page-intro { font-size: var(--font-size-sm); }
+  .regulation-copy h2 { font-size: var(--font-size-lg); }
 }

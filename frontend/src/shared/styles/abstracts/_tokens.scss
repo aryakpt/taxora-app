@@ -1,22 +1,97 @@
-// Shared Taxora design system: change semantic tokens here instead of scattering colors and values.
-$color-ink: #222c39;
-$color-muted: #76808c;
-$color-border: #e5e8ec;
+// Taxora design tokens: the single place for colors, type sizes, spacing, radii, motion, and breakpoints.
+//
+// Components use the CSS custom properties (var(--color-…), var(--font-size-…)), never raw values, so a theme
+// or a breakpoint changes them in one place. The dark theme gets its values from the build-time generator
+// (frontend/theme/darkTheme.ts), which maps this :root block; hand-tuned dark values are in themes/_dark.scss.
+// Text colors are measured against the page (#f7f8fa) and white cards: body text >= 4.5:1 (WCAG AA).
+
+@use 'sass:map';
+
+// --- Color: text ------------------------------------------------------------------------------------------
+$color-text-strong: #25394a;    // 11.6:1 headings, brand name
+$color-text: #2f3d47;           // 10.9:1 primary text, input values
+$color-text-emphasis: #3e5147;  //  8.4:1 card titles, form legends (green-tinted ink)
+$color-text-body: #46525c;      //  7.6:1 running text, labels
+$color-text-secondary: #56616b; //  6.0:1 descriptions, hints, metadata
+$color-text-tertiary: #69737c;  //  4.6:1 eyebrows, timestamps, captions
+$color-text-brand: #2c644f;     //  6.4:1 active navigation, links, positive state
+$color-text-brand-muted: #4f6858; // 5.6:1 icons and labels in the brand tone
+$color-text-placeholder: #8a939a; // placeholder text (stays lighter than real values on purpose)
+$color-text-inverse: #ffffff;   // on filled buttons
+
+// --- Color: surfaces --------------------------------------------------------------------------------------
+$color-canvas: #f7f8fa;         // the page
+$color-surface: #ffffff;        // cards, inputs, menus, dialogs
+$color-surface-sidebar: #fbfbfa;
+$color-surface-subtle: #f8faf9; // quiet panels, chips, quotes
+$color-surface-muted: #f0f2f3;  // hover fill, code
+$color-surface-strong: #e7ebed; // pressed fill, avatars
+$color-surface-brand: #edf4ef;  // selected item, brand-tinted badges
+$color-surface-brand-strong: #e2efe8; // user message bubble, active chip
+$color-scrim: #17252e66;        // behind dialogs and the mobile drawer
+$color-surface-topbar: #fbfbfaef; // translucent, with a backdrop blur
+$color-status-online: #62a587;
+$color-status-online-ring: #62a58720;
+
+// --- Color: borders ---------------------------------------------------------------------------------------
+$color-border: #e3e7e5;
+$color-border-subtle: #eef0ef;
+$color-border-strong: #d6dfd9;
+$color-border-hover: #b4c9bb;
+
+// --- Color: brand and actions ----------------------------------------------------------------------------
 $color-brand-navy: #203b57;
 $color-brand-green: #317b65;
-$color-brand-green-soft: #e7f2ed;
 $color-gold: #d6a84c;
-$color-canvas: #f7f8fa;
-$color-surface: #ffffff;
+$color-action: #284b42;         // filled buttons
+$color-action-hover: #1f4038;
+$color-action-disabled: #a9bbb3;
 $color-focus: #5c9b84;
 
-$font-body: 'DM Sans', sans-serif;
-$font-display: 'Newsreader', serif;
+// --- Color: status (text on its own soft background >= 4.5:1) ---------------------------------------------
+$color-success-text: #3f6e4f;
+$color-success-surface: #eef6f0;
+$color-success-border: #d6e8da;
+$color-warning-text: #7d5a29;
+$color-warning-surface: #faf3e7;
+$color-warning-border: #e2c88d;
+$color-danger-text: #9b4a42;
+$color-danger-surface: #fbefee;
+$color-danger-border: #efd3cf;
+$color-danger: #b4574e;         // filled destructive button
+$color-danger-hover: #9b4a42;
+$color-info-text: #3d5f80;
+$color-info-surface: #eef3f8;
 
-$radius-control: 6px;
-$radius-card: 9px;
-$radius-dialog: 11px;
+// --- Typography -------------------------------------------------------------------------------------------
+// rem, so the reader's browser or phone text size is respected. Display sizes are fluid: they shrink on small
+// screens without per-breakpoint overrides.
+$font-body: 'DM Sans', system-ui, sans-serif;
+$font-display: 'Newsreader', Georgia, serif;
+$font-sizes: (
+  'xs': 0.75rem,                                  // 12px captions, labels, badges
+  'sm': 0.8125rem,                                // 13px secondary text, controls
+  'md': 0.875rem,                                 // 14px body in dense UI, navigation
+  'base': 0.9375rem,                              // 15px reading text (answers)
+  'lg': 1rem,                                     // 16px emphasized body, inputs on phones
+  'xl': 1.125rem,                                 // 18px small headings
+  '2xl': clamp(1.1875rem, 1.1rem + 0.4vw, 1.375rem), // 19-22px card and dialog titles
+  '3xl': clamp(1.375rem, 1.2rem + 0.8vw, 1.5rem),    // 22-24px section titles
+  '4xl': clamp(1.75rem, 1.4rem + 1.6vw, 2.3125rem),  // 28-37px page titles
+  '5xl': clamp(2rem, 1.5rem + 2.4vw, 2.625rem),      // 32-42px the welcome headline
+);
 
+// --- Elevation --------------------------------------------------------------------------------------------
+$shadows: (
+  'xs': 0 1px 2px #182b3a0d,       // buttons
+  'sm': 0 4px 16px #233c4e09,      // composer, cards on hover
+  'md': 0 10px 30px #182b3a1f,     // menus
+  'lg': 0 18px 60px #203b570d,     // the sign-in card
+  'xl': 0 18px 70px #101b2633,     // dialogs
+  'drawer': 10px 0 40px #142a3912, // the mobile sidebar
+);
+
+// --- Spacing, radii, motion -------------------------------------------------------------------------------
 $space-1: 4px;
 $space-2: 8px;
 $space-3: 12px;
@@ -24,32 +99,128 @@ $space-4: 16px;
 $space-6: 24px;
 $space-8: 32px;
 
+$radius-control: 6px;
+$radius-card: 9px;
+$radius-dialog: 11px;
+
 $motion-fast: 150ms;
 $motion-standard: 220ms;
 
+// --- Breakpoints ------------------------------------------------------------------------------------------
+// Max-width queries for the layouts below each size; use the mixins rather than raw numbers.
+$breakpoints: (
+  'xs': 400px,   // small phones (360-400)
+  'sm': 540px,   // phones
+  'md': 800px,   // tablets portrait and small windows: the sidebar becomes a drawer
+  'lg': 1100px,  // tablets landscape, small laptops
+);
+
+@mixin below($name) {
+  @media (max-width: map.get($breakpoints, $name)) { @content; }
+}
+
+@mixin above($name) {
+  @media (min-width: map.get($breakpoints, $name) + 1px) { @content; }
+}
+
+// The sidebar is a slide-in drawer on narrow screens and on short ones (phones in landscape), and a fixed
+// column otherwise. Legacy rules (legacy/_application.scss) use the same condition written out.
+$drawer-query: '(max-width: 800px), (max-height: 500px)';
+$sidebar-query: '(min-width: 801px) and (min-height: 501px)';
+
+@mixin drawer-layout {
+  @media #{$drawer-query} { @content; }
+}
+
+@mixin sidebar-layout {
+  @media #{$sidebar-query} { @content; }
+}
+
+@mixin touch {
+  @media (hover: none) and (pointer: coarse) { @content; }
+}
+
 :root {
-  --color-ink: #{$color-ink};
-  --color-muted: #{$color-muted};
-  --color-border: #{$color-border};
-  --color-brand-navy: #{$color-brand-navy};
-  --color-brand-green: #{$color-brand-green};
-  --color-brand-green-soft: #{$color-brand-green-soft};
-  --color-gold: #{$color-gold};
+  --color-text-strong: #{$color-text-strong};
+  --color-text: #{$color-text};
+  --color-text-emphasis: #{$color-text-emphasis};
+  --color-text-body: #{$color-text-body};
+  --color-text-secondary: #{$color-text-secondary};
+  --color-text-tertiary: #{$color-text-tertiary};
+  --color-text-brand: #{$color-text-brand};
+  --color-text-brand-muted: #{$color-text-brand-muted};
+  --color-text-placeholder: #{$color-text-placeholder};
+  --color-text-inverse: #{$color-text-inverse};
+
   --color-canvas: #{$color-canvas};
   --color-surface: #{$color-surface};
+  --color-surface-sidebar: #{$color-surface-sidebar};
+  --color-surface-subtle: #{$color-surface-subtle};
+  --color-surface-muted: #{$color-surface-muted};
+  --color-surface-strong: #{$color-surface-strong};
+  --color-surface-brand: #{$color-surface-brand};
+  --color-surface-brand-strong: #{$color-surface-brand-strong};
+  --color-scrim: #{$color-scrim};
+  --color-surface-topbar: #{$color-surface-topbar};
+  --color-status-online: #{$color-status-online};
+  --color-status-online-ring: #{$color-status-online-ring};
+
+  --color-border: #{$color-border};
+  --color-border-subtle: #{$color-border-subtle};
+  --color-border-strong: #{$color-border-strong};
+  --color-border-hover: #{$color-border-hover};
+
+  --color-brand-navy: #{$color-brand-navy};
+  --color-brand-green: #{$color-brand-green};
+  --color-gold: #{$color-gold};
+  --color-action: #{$color-action};
+  --color-action-hover: #{$color-action-hover};
+  --color-action-disabled: #{$color-action-disabled};
   --color-focus: #{$color-focus};
-  // Compatibility aliases used by the legacy UI rules during migration.
-  --ink: #{$color-ink};
-  --muted: #{$color-muted};
-  --line: #{$color-border};
-  --navy: #{$color-brand-navy};
-  --green: #{$color-brand-green};
-  --green-light: #{$color-brand-green-soft};
-  --paper: #{$color-surface};
-  --gold: #{$color-gold};
+
+  --color-success-text: #{$color-success-text};
+  --color-success-surface: #{$color-success-surface};
+  --color-success-border: #{$color-success-border};
+  --color-warning-text: #{$color-warning-text};
+  --color-warning-surface: #{$color-warning-surface};
+  --color-warning-border: #{$color-warning-border};
+  --color-danger-text: #{$color-danger-text};
+  --color-danger-surface: #{$color-danger-surface};
+  --color-danger-border: #{$color-danger-border};
+  --color-danger: #{$color-danger};
+  --color-danger-hover: #{$color-danger-hover};
+  --color-info-text: #{$color-info-text};
+  --color-info-surface: #{$color-info-surface};
+
+  @each $name, $shadow in $shadows {
+    --shadow-#{$name}: #{$shadow};
+  }
+  @each $name, $size in $font-sizes {
+    --font-size-#{$name}: #{$size};
+  }
   --font-body: #{$font-body};
   --font-display: #{$font-display};
   --radius-control: #{$radius-control};
   --radius-card: #{$radius-card};
   --radius-dialog: #{$radius-dialog};
+
+  // Older names still used in a few places; they point at the tokens above.
+  --color-ink: var(--color-text);
+  --color-muted: var(--color-text-secondary);
+  --color-brand-green-soft: var(--color-surface-brand-strong);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary: var(--color-text-tertiary);
+  --ink: var(--color-text);
+  --muted: var(--color-text-secondary);
+  --line: var(--color-border);
+  --navy: var(--color-brand-navy);
+  --green: var(--color-brand-green);
+  --green-light: var(--color-surface-brand-strong);
+  --paper: var(--color-surface);
+  --gold: var(--color-gold);
 }
+
+// Sass names kept for partials that still use them.
+$color-ink: $color-text;
+$color-muted: $color-text-secondary;
+$color-brand-green-soft: $color-surface-brand-strong;

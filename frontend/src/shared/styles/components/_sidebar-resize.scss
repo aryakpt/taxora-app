@@ -1,7 +1,7 @@
 // Desktop sidebar width, set by dragging its right edge (SidebarResizer, useSidebarWidth).
 @use '../abstracts/tokens' as *;
 
-@media (min-width: 801px) {
+@include sidebar-layout {
   .sidebar { width: var(--sidebar-width, 258px); }
   .main-area { margin-left: var(--sidebar-width, 258px); }
   .sidebar-collapsed .main-area { margin-left: 0; }
@@ -29,7 +29,7 @@
     transition: background $motion-fast;
   }
 
-  &:hover::after, &:focus-visible::after { background: $color-focus; }
+  &:hover::after, &:focus-visible::after { background: var(--color-focus); }
   &:focus-visible { outline: none; }
 }
 
@@ -39,11 +39,11 @@
   user-select: none;
 
   .sidebar, .main-area { transition: none; }
-  .sidebar-resizer::after { background: $color-focus; }
+  .sidebar-resizer::after { background: var(--color-focus); }
 }
 
 // On phones the sidebar is a slide-in drawer with a fixed width; the collapsed sidebar has no edge to drag.
-@media (max-width: 800px) {
+@include drawer-layout {
   .sidebar-resizer { display: none; }
 }
 
@@ -59,9 +59,9 @@
   padding: 10px;
   border: 0;
   border-radius: 6px;
-  background: #284b42;
-  color: white;
-  font-size: 14px;
+  background: var(--color-action);
+  color: var(--color-text-inverse);
+  font-size: var(--font-size-md);
   font-weight: 600;
   box-shadow: none;
   transition: background $motion-fast;
@@ -69,6 +69,6 @@
   svg { flex-shrink: 0; }
   span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
-  &:hover { background: #1f4038; border-color: transparent; }
-  &:focus-visible { outline: 3px solid $color-focus; outline-offset: 2px; }
+  &:hover { background: var(--color-action-hover); border-color: transparent; }
+  &:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 }

@@ -15,8 +15,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  color: tokens.$color-ink;
-  background: tokens.$color-canvas;
+  color: var(--color-text);
+  background: var(--color-canvas);
   font-family: tokens.$font-body;
   -webkit-font-smoothing: antialiased;
 }
@@ -38,6 +38,6 @@ a {
 }
 
 :focus-visible {
-  outline: 3px solid tokens.$color-focus;
+  outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }

@@ -1,0 +1,88 @@
+// Device fit: phone viewport height, safe areas (notch, home indicator), text input size on iOS, and the
+// layouts for small phones, landscape phones, and tablets. Component-specific breakpoints stay in their
+// partials; everything here uses the breakpoint mixins from abstracts/_tokens.scss.
+@use '../abstracts/tokens' as *;
+
+// The visible viewport on phones (100vh includes the area under the browser's address bar).
+body,
+.app-shell,
+.main-area,
+.auth-screen {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+// Safe areas (index.html sets viewport-fit=cover): keep controls clear of the notch and the home indicator.
+.composer-wrap { padding-bottom: max(18px, env(safe-area-inset-bottom)); }
+.sidebar { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+.topbar {
+  padding-left: max(29px, env(safe-area-inset-left));
+  padding-right: max(29px, env(safe-area-inset-right));
+}
+
+// iOS zooms the page when a focused field's text is under 16px; on touch screens fields use 16px.
+@include touch {
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea,
+  .composer-box textarea,
+  .context-field input,
+  .context-field select,
+  .ingest-form input,
+  .ingest-form select,
+  .language-switcher select { font-size: var(--font-size-lg); }
+
+  // Buttons and links: at least a 40px touch target in dense rows, 44px for primary actions.
+  .send-button,
+  .primary-button,
+  .secondary-button,
+  .auth-submit { min-height: 44px; }
+  .icon-btn,
+  .help-btn,
+  .theme-toggle,
+  .message-actions button { min-width: 40px; min-height: 40px; }
+  .language-switcher select { min-height: 40px; }
+  .segmented button,
+  .text-button { min-height: 40px; }
+  .auth-switch button { padding-block: 10px; margin-block: -10px; } // 40px tall, the line height unchanged
+}
+
+@include drawer-layout {
+  .topbar {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+}
+
+@include below('sm') {
+  .composer-wrap { padding-bottom: max(11px, env(safe-area-inset-bottom)); }
+  .topbar {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+}
+
+// Small phones (360-400px): one suggestion per row, and the context row of the composer wraps.
+@include below('xs') {
+  .suggestion-grid { grid-template-columns: 1fr; }
+  .suggestion-card { min-height: 0; }
+  .trust-chips span { height: auto; min-height: 27px; padding: 4px 8px; }
+  .page-panel { width: calc(100% - 24px); }
+  .breadcrumb,
+  .crumb-sep { display: none; } // the current page name is enough on the narrowest screens
+}
+
+// Phones in landscape: little height, so the welcome screen and the composer get compact.
+@media (max-height: 500px) and (orientation: landscape) {
+  .welcome { margin-top: 20px; }
+  .welcome-emblem { display: none; }
+  .welcome h1 { margin-top: 10px; }
+  .trust-chips { margin: 12px auto 18px; }
+  .composer-box textarea { min-height: 44px; }
+  .composer-disclaimer { display: none; }
+
+  // The drawer is as short as the screen: let it scroll, keep room for the history, drop the side note.
+  .sidebar { overflow-y: auto; }
+  .history-list { min-height: 132px; flex-shrink: 0; }
+  .privacy-note { display: none; }
+}
