@@ -8,3 +8,16 @@
 .main-area {
   min-width: 0;
 }
+
+// Wide pages (Knowledge Admin, Regulation Library): the width of the main area with side gutters, for tables,
+// lists, and two-column forms; very wide screens stop at 1600px so lines stay readable.
+.page-panel.wide {
+  width: calc(100% - 64px);
+  max-width: 1600px;
+
+  .success-banner,
+  .error-banner { width: 100%; margin: 0 0 tokens.$space-3; }
+}
+
+@include tokens.below('md') { .page-panel.wide { width: calc(100% - 40px); } }
+@include tokens.below('sm') { .page-panel.wide { width: calc(100% - 30px); } }

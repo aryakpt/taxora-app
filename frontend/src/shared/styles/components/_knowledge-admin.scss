@@ -127,15 +127,17 @@
 
   .job-status { display: inline-block; font-size: var(--font-size-xs); }
 
-  h2 {
+  h1 {
     margin: 10px 0 4px;
     font-family: $font-display;
-    font-size: var(--font-size-2xl);
+    font-size: var(--font-size-3xl);
     font-weight: 500;
     color: var(--color-text-strong);
   }
 
-  p { margin: 0; font-size: var(--font-size-xs); line-height: 1.5; color: var(--color-text-secondary); }
+  p { margin: 0; font-size: var(--font-size-sm); line-height: 1.5; color: var(--color-text-secondary); }
+  .review-type { font-size: var(--font-size-xs); font-weight: 600; letter-spacing: .3px; color: var(--color-text-brand-muted); }
+  .review-title { margin-top: 6px; font-size: var(--font-size-md); color: var(--color-text-body); }
 }
 
 .review-facts {
@@ -315,4 +317,310 @@
   min-height: 28px;
   padding: 4px 6px;
   border-radius: 5px;
+}
+
+
+// --- Knowledge Admin pages: page header, table, toolbar, pagination ------------------------------------------
+
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: $space-4;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+
+  &:hover { color: var(--color-text); text-decoration: underline; }
+}
+
+.page-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: $space-3;
+
+  h1 {
+    margin: 12px 0 7px;
+    font-family: $font-display;
+    font-size: var(--font-size-4xl);
+    font-weight: 400;
+    letter-spacing: -.8px;
+    color: var(--color-text-strong);
+  }
+
+  .primary-button { text-decoration: none; }
+}
+
+.table-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $space-3;
+  margin-bottom: $space-3;
+
+  .jobs-live { margin-left: auto; }
+}
+
+.search-field {
+  flex: 1 1 260px;
+  display: flex;
+  align-items: center;
+  gap: $space-2;
+  min-height: 38px;
+  padding: 0 $space-3;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-control;
+  background: var(--color-surface);
+  color: var(--color-text-tertiary);
+
+  &:focus-within { border-color: var(--color-focus); }
+
+  input {
+    flex: 1;
+    min-width: 0;
+    height: 36px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--color-text);
+    font-size: var(--font-size-sm);
+  }
+}
+
+.status-filter select {
+  min-height: 38px;
+  padding: 0 $space-3;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-control;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: $radius-card;
+  background: var(--color-surface);
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+
+  th {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface-subtle);
+    color: var(--color-text-tertiary);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+    letter-spacing: .4px;
+    text-align: left;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-body);
+    vertical-align: top;
+  }
+
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: var(--color-surface-subtle); }
+  time { white-space: nowrap; color: var(--color-text-secondary); }
+}
+
+.jobs-table {
+  .job-cell {
+    display: flex;
+    gap: 10px;
+    min-width: 0;
+
+    > svg { flex-shrink: 0; margin-top: 2px; color: var(--color-text-brand-muted); }
+    > div { display: grid; gap: 3px; min-width: 0; }
+  }
+
+  .job-name {
+    color: var(--color-text-strong);
+    font-weight: 600;
+    text-decoration: none;
+
+    &:hover { text-decoration: underline; }
+  }
+
+  .job-type { font-size: var(--font-size-xs); color: var(--color-text-tertiary); }
+  .job-title {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: var(--color-text-secondary);
+  }
+  .job-error { color: var(--color-danger-text); font-size: var(--font-size-xs); }
+
+  .job-status { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: var(--font-size-xs); }
+  .cell-action { width: 1%; text-align: right; vertical-align: middle; }
+}
+
+.secondary-button.small {
+  height: 30px;
+  padding: 0 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: $space-3 $space-4;
+  margin-top: $space-3;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+
+  .pagination-summary { margin-right: auto; }
+
+  .pagination-size {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+
+    select {
+      min-height: 32px;
+      padding: 0 6px;
+      border: 1px solid var(--color-border);
+      border-radius: $radius-control;
+      background: var(--color-surface);
+      color: var(--color-text);
+    }
+  }
+
+  .pagination-pages {
+    display: flex;
+    align-items: center;
+    gap: $space-1;
+
+    .icon-btn:disabled { opacity: .4; cursor: not-allowed; }
+  }
+}
+
+// Phones: each row becomes a card with labelled values; the header row is hidden.
+@include below('sm') {
+  .table-scroll { border: 0; background: transparent; overflow: visible; }
+
+  .data-table {
+    thead { display: none; }
+
+    tbody { display: grid; gap: $space-3; }
+
+    tr {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: $space-2 $space-3;
+      padding: $space-3;
+      border: 1px solid var(--color-border);
+      border-radius: $radius-card;
+      background: var(--color-surface);
+    }
+
+    td { display: block; padding: 0; border: 0; }
+    td:first-child { grid-column: 1 / -1; }
+    td[data-label]:not(:first-child)::before {
+      content: attr(data-label);
+      display: block;
+      margin-bottom: 2px;
+      color: var(--color-text-tertiary);
+      font-size: var(--font-size-xs);
+    }
+    .cell-action { grid-column: 1 / -1; text-align: left; }
+  }
+
+  .pagination .pagination-summary { flex-basis: 100%; }
+}
+
+// --- Form: sections, labels with an explanation ---------------------------------------------------------------
+
+.form-intro { margin: 0; font-size: var(--font-size-sm); line-height: 1.6; color: var(--color-text-secondary); }
+
+.form-section {
+  display: grid;
+  gap: 13px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+
+  & + & { padding-top: $space-4; border-top: 1px solid var(--color-border-subtle); }
+  legend { padding: 0; margin-bottom: $space-2; font-size: var(--font-size-xs); font-weight: 600; color: var(--color-text-secondary); }
+}
+
+.ingest-form textarea {
+  min-height: 60px;
+  padding: 9px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: var(--color-surface);
+  color: var(--color-text-body);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+// Grid and flex children default to their content's width: a select sizes itself to its longest option and
+// pushed the form past the screen on phones.
+.ingest-form {
+  label, .form-grid > * { min-width: 0; }
+  input:not([type='checkbox']), select, textarea { width: 100%; max-width: 100%; min-width: 0; }
+}
+
+.field-label { display: inline-flex; align-items: center; gap: 5px; }
+
+.info-tooltip {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+}
+
+.info-tooltip-button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: help;
+
+  &:hover, &[aria-expanded='true'] { color: var(--color-text-brand); background: var(--color-surface-brand); }
+}
+
+.info-tooltip-text {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -10px;
+  z-index: 15;
+  width: max-content;
+  max-width: min(300px, 80vw);
+  padding: 8px 10px;
+  border-radius: $radius-control;
+  background: var(--color-text-strong);
+  box-shadow: var(--shadow-md);
+  color: var(--color-surface);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: normal;
 }

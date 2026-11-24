@@ -1,13 +1,13 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Form, HTTPException, Query, Response, status
 
 from app.core.config import settings
 from app.core.database import SessionDep
 from app.modules.auth.dependencies import AdminUser, ReviewerUser
 from app.modules.ingestion import service, storage
-from app.modules.ingestion.models import IngestionJob
+from app.modules.ingestion.models import IngestionJob, JobStatus
 from app.modules.ingestion.schemas import MetadataCorrection, Rejection, UploadForm, UrlSubmission, VersionDates
 
 router = APIRouter(prefix="/api/v1/admin/ingestion", tags=["admin"])
@@ -65,8 +65,16 @@ async def create_from_upload(
 
 
 @router.get("")
-async def list_jobs(session: SessionDep, user: ReviewerUser):
-    return await service.list_jobs(session)
+async def list_jobs(
+    session: SessionDep,
+    user: ReviewerUser,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 10,
+    status: JobStatus | None = None,
+    q: Annotated[str, Query(max_length=100)] = "",
+):
+    """Jobs for the Knowledge Admin table: newest first, paginated, filtered by status, searched by `q`."""
+    return await service.list_jobs(session, page, page_size, status.value if status else None, q)
 
 
 @router.get("/{job_id}")

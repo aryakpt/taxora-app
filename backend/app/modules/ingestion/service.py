@@ -11,7 +11,7 @@ import logging
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -478,6 +478,30 @@ async def provisions(session: AsyncSession, job_id: uuid.UUID) -> list[dict]:
             for p, total in rows]
 
 
-async def list_jobs(session: AsyncSession) -> list[dict]:
-    jobs = (await session.scalars(select(IngestionJob).order_by(IngestionJob.created_at.desc()).limit(200))).all()
-    return [await describe(session, job) for job in jobs]
+def _search(text: str):
+    """Every word must appear in the regulation type, number, or title, or in the file name or link."""
+    conditions = []
+    for word in text.split():
+        pattern = "%" + word.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        conditions.append(or_(*(column.ilike(pattern, escape="\\") for column in (
+            Regulation.regulation_type, Regulation.regulation_number, Regulation.title,
+            IngestionJob.filename, IngestionJob.source_url))))
+    return and_(*conditions)
+
+
+async def list_jobs(session: AsyncSession, page: int = 1, page_size: int = 10, status: str | None = None,
+                    search: str = "") -> dict:
+    """One page of jobs, newest first, optionally filtered by status and searched; with the count per status
+    (for the filter) and the total that matches."""
+    query = select(IngestionJob).outerjoin(Regulation, Regulation.id == IngestionJob.regulation_id)
+    if search.strip():
+        query = query.where(_search(search))
+    counts = dict((await session.execute(
+        query.with_only_columns(IngestionJob.status, func.count()).group_by(IngestionJob.status))).all())
+    if status:
+        query = query.where(IngestionJob.status == status)
+    total = await session.scalar(query.with_only_columns(func.count()))
+    jobs = (await session.scalars(query.order_by(IngestionJob.created_at.desc(), IngestionJob.id)
+                                  .offset((page - 1) * page_size).limit(page_size))).all()
+    return {"items": [await describe(session, job) for job in jobs], "total": total, "page": page,
+            "page_size": page_size, "status_counts": counts}

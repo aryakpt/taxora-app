@@ -3,6 +3,7 @@ import { History, PencilLine } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { IngestionJob } from '../../../shared/types/tax'
 import type { MetadataCorrection } from '../api/ingestionApi'
+import { FieldLabel } from './FieldLabel'
 
 interface Props {
   job: IngestionJob
@@ -49,19 +50,19 @@ export function MetadataCorrectionForm({ job, onSubmit }: Props) {
     <p className="muted">{t('admin.correction.intro')}</p>
 
     {open && <form className="correction-form" onSubmit={submit}>
-      <label>{t('admin.titleField')}<input required value={form.title} onChange={event => set('title', event.target.value)} /></label>
+      <label><FieldLabel text={t('admin.titleField')} help="title" /><textarea required rows={2} maxLength={1000} value={form.title} onChange={event => set('title', event.target.value)} /></label>
       <div className="form-grid">
-        <label>{t('admin.issuer')}<input required value={form.issuer} onChange={event => set('issuer', event.target.value)} /></label>
-        <label>{t('admin.topic')}
+        <label><FieldLabel text={t('admin.issuer')} help="issuer" /><input required maxLength={200} value={form.issuer} onChange={event => set('issuer', event.target.value)} /></label>
+        <label><FieldLabel text={t('admin.topic')} help="topic" />
           <select value={form.topic} onChange={event => set('topic', event.target.value as MetadataCorrection['topic'])}>
-            <option value="PPh">PPh</option><option value="PPN">PPN</option><option value="other">{t('admin.other')}</option>
+            {(['PPh', 'PPN', 'other'] as const).map(topic => <option key={topic} value={topic}>{t(`admin.topics.${topic}`)}</option>)}
           </select>
         </label>
       </div>
       <div className="form-grid three">
-        <label>{t('admin.issuedAt')}<input type="date" value={form.issued_at ?? ''} onChange={event => setDate('issued_at', event.target.value)} /></label>
-        <label>{t('admin.effectiveFrom')}<input type="date" value={form.effective_from ?? ''} onChange={event => setDate('effective_from', event.target.value)} /></label>
-        <label>{t('admin.effectiveUntil')}<input type="date" value={form.effective_until ?? ''} onChange={event => setDate('effective_until', event.target.value)} /></label>
+        <label><FieldLabel text={t('admin.issuedAt')} help="issuedAt" /><input type="date" value={form.issued_at ?? ''} onChange={event => setDate('issued_at', event.target.value)} /></label>
+        <label><FieldLabel text={t('admin.effectiveFrom')} help="effectiveFrom" /><input type="date" value={form.effective_from ?? ''} onChange={event => setDate('effective_from', event.target.value)} /></label>
+        <label><FieldLabel text={t('admin.effectiveUntil')} help="effectiveUntil" /><input type="date" value={form.effective_until ?? ''} onChange={event => setDate('effective_until', event.target.value)} /></label>
       </div>
       <label>{t('admin.correction.reason')}
         <textarea required minLength={5} maxLength={500} rows={2} value={form.reason} onChange={event => set('reason', event.target.value)} placeholder={t('admin.correction.reasonPlaceholder')} />

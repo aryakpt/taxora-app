@@ -17,7 +17,7 @@ export function RegulationLibraryPage({ request, error, setError }: Props) {
     setLoading(true)
     createRegulationsApi(request).list().then(setRegulations).catch((cause: Error) => setError(cause.message)).finally(() => setLoading(false))
   }, [request, setError])
-  return <section className="page-panel">
+  return <section className="page-panel wide">
     <div className="page-kicker"><BookOpen size={16} /> {t('regulations.eyebrow')}</div><h1>{t('regulations.title')}</h1>
     <p className="page-intro">{t('regulations.intro')}</p>
     {error && <div className="error-banner" role="alert">{error}</div>}

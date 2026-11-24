@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Ban, CheckCircle2, Download, ExternalLink, RotateCcw, Send, Trash2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, Ban, CheckCircle2, Download, ExternalLink, RotateCcw, Send, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ExtractedSection, IngestionJob } from '../../../shared/types/tax'
 import type { IngestionApi, MetadataCorrection, VersionDates } from '../api/ingestionApi'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
-import { jobLabel } from './IngestionJobList'
+import { regulationTypeName } from '../regulationTypes'
+import { FieldLabel } from './FieldLabel'
+import { jobLabel } from './IngestionJobTable'
 import { MetadataCorrectionForm } from './MetadataCorrectionForm'
 
 interface Props {
@@ -14,7 +16,6 @@ interface Props {
   onChanged: (job: IngestionJob, notice: string) => void
   onDeleted: (jobId: string, notice: string) => void
   onError: (message: string) => void
-  onClose: () => void
 }
 
 const datesOf = (job: IngestionJob): VersionDates => ({
@@ -23,7 +24,7 @@ const datesOf = (job: IngestionJob): VersionDates => ({
   effective_until: job.version?.effective_until ?? null,
 })
 
-export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onError, onClose }: Props) {
+export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onError }: Props) {
   const { t, i18n } = useTranslation()
   const [sections, setSections] = useState<ExtractedSection[] | null>(null)
   const [dates, setDates] = useState<VersionDates>(() => datesOf(job))
@@ -31,11 +32,8 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onErro
   const [busy, setBusy] = useState(false)
   const [dialog, setDialog] = useState<'reject' | 'delete' | null>(null)
   const [reason, setReason] = useState('')
-  const panel = useRef<HTMLElement>(null)
   const underReview = job.status === 'review_required'
   const versionId = job.version?.id
-
-  useEffect(() => { panel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }, [])
 
   useEffect(() => {
     setSections(null)
@@ -97,18 +95,21 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onErro
   const datesChanged = JSON.stringify(dates) !== serverDates
   const setDate = (key: keyof VersionDates, value: string) => setDates(current => ({ ...current, [key]: value || null }))
 
-  return <section ref={panel} className="review-panel" aria-label={t('admin.review.title')}>
+  return <article className="review-panel" aria-label={t('admin.review.title')}>
     <header className="review-header">
       <div>
         <span className={`job-status ${job.status}`}>{t(`admin.statuses.${job.status}`)}</span>
-        <h2>{jobLabel(job)}</h2>
-        {job.regulation && <p>{job.regulation.title}</p>}
+        <h1>{jobLabel(job)}</h1>
+        {job.regulation && <p className="review-type">{regulationTypeName(job.regulation.type)}</p>}
+        {job.regulation && <p className="review-title">{job.regulation.title}</p>}
       </div>
-      <button className="icon-btn" onClick={onClose} aria-label={t('common.close')}><X size={17} /></button>
     </header>
 
     <dl className="review-facts">
-      {job.regulation && <><dt>{t('admin.issuer')}</dt><dd>{job.regulation.issuer}</dd><dt>{t('admin.topic')}</dt><dd>{job.regulation.topic === 'other' ? t('admin.other') : job.regulation.topic}</dd></>}
+      {job.regulation && <>
+        <dt><FieldLabel text={t('admin.issuer')} help="issuer" /></dt><dd>{job.regulation.issuer}</dd>
+        <dt>{t('admin.topic')}</dt><dd>{t(`admin.topics.${job.regulation.topic}`)}</dd>
+      </>}
       <dt>{t('admin.sourceUrl')}</dt>
       <dd>{job.source_url
         ? <a href={job.source_url} target="_blank" rel="noreferrer noopener">{job.source_url} <ExternalLink size={12} /></a>
@@ -126,9 +127,9 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onErro
     {job.version && <fieldset className="review-dates" disabled={!underReview || busy}>
       <legend>{t('admin.review.dates')}</legend>
       <div className="form-grid three">
-        <label>{t('admin.issuedAt')}<input type="date" value={dates.issued_at ?? ''} onChange={event => setDate('issued_at', event.target.value)} /></label>
-        <label>{t('admin.effectiveFrom')}<input type="date" value={dates.effective_from ?? ''} onChange={event => setDate('effective_from', event.target.value)} /></label>
-        <label>{t('admin.effectiveUntil')}<input type="date" value={dates.effective_until ?? ''} onChange={event => setDate('effective_until', event.target.value)} /></label>
+        <label><FieldLabel text={t('admin.issuedAt')} help="issuedAt" /><input type="date" value={dates.issued_at ?? ''} onChange={event => setDate('issued_at', event.target.value)} /></label>
+        <label><FieldLabel text={t('admin.effectiveFrom')} help="effectiveFrom" /><input type="date" value={dates.effective_from ?? ''} onChange={event => setDate('effective_from', event.target.value)} /></label>
+        <label><FieldLabel text={t('admin.effectiveUntil')} help="effectiveUntil" /><input type="date" value={dates.effective_until ?? ''} onChange={event => setDate('effective_until', event.target.value)} /></label>
       </div>
       {underReview
         ? <button className="secondary-button" disabled={!datesChanged} onClick={() => void run(() => api.updateDates(job.id, dates), t('admin.review.datesSaved'))}>{t('admin.review.saveDates')}</button>
@@ -189,5 +190,5 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onErro
       confirmLabel={t('admin.review.delete')} cancelLabel={t('history.cancel')}
       onConfirm={() => void remove()} onCancel={() => setDialog(null)}
     />}
-  </section>
+  </article>
 }

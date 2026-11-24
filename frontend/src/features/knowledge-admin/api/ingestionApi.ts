@@ -30,12 +30,32 @@ export interface MetadataCorrection extends VersionDates {
   reason: string
 }
 
+/** One page of the Knowledge Admin table (GET /api/v1/admin/ingestion). */
+export interface JobPage {
+  items: IngestionJob[]
+  total: number
+  page: number
+  page_size: number
+  /** Jobs per status for the current search, regardless of the status filter. */
+  status_counts: Partial<Record<IngestionJob['status'], number>>
+}
+
+export interface JobQuery {
+  page: number
+  pageSize: number
+  status: IngestionJob['status'] | ''
+  search: string
+}
+
 export function createIngestionApi(request: ApiRequest) {
   const action = (id: string, name: 'approve' | 'publish' | 'retry') =>
     request<IngestionJob>(`${BASE}/${id}/${name}`, { method: 'POST' })
 
   return {
-    list: () => request<IngestionJob[]>(BASE),
+    list: ({ page, pageSize, status, search }: JobQuery) => request<JobPage>(BASE, {
+      params: { page, page_size: pageSize, ...(status ? { status } : {}), ...(search.trim() ? { q: search.trim() } : {}) },
+    }),
+    get: (id: string) => request<IngestionJob>(`${BASE}/${id}`),
     submitUrl: (metadata: RegulationMetadata) => request<IngestionJob>(BASE, { method: 'POST', data: metadata }),
     upload: (metadata: RegulationMetadata, file: File) => {
       const form = new FormData()

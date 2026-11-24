@@ -485,3 +485,30 @@ async def test_with_a_stale_limit_only_old_unfinished_jobs_are_failed(monkeypatc
     async with SessionLocal() as session:
         statuses = sorted((await session.scalars(select(IngestionJob.status))).all())
     assert statuses == ["failed", "processing"]
+
+
+# --- the Knowledge Admin table: pagination, status filter, search -----------------------------------------
+
+async def test_the_job_table_is_paginated_filtered_and_searchable(client, source):
+    documents, _ = source
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    for number in range(1, 8):  # seven documents, different files and numbers
+        url = f"https://peraturan.bpk.go.id/Download/{number}/fixture.pdf"
+        documents[url] = make_pdf([*FIXTURE_LINES, f"Nomor {number}"])
+        await submit(client, source_url=url, regulation_number=f"{number} TAHUN 2026", title=f"[FIXTURE] Aturan {number}")
+
+    first = (await client.get("/api/v1/admin/ingestion", params={"page_size": 3})).json()
+    last = (await client.get("/api/v1/admin/ingestion", params={"page_size": 3, "page": 3})).json()
+
+    assert first["total"] == 7 and len(first["items"]) == 3 and len(last["items"]) == 1
+    assert first["items"][0]["regulation"]["number"] == "7 TAHUN 2026"  # newest first
+    assert first["status_counts"] == {"review_required": 7}
+
+    found = (await client.get("/api/v1/admin/ingestion", params={"q": "fixture 5 tahun"})).json()
+    assert [job["regulation"]["number"] for job in found["items"]] == ["5 TAHUN 2026"]
+    assert (await client.get("/api/v1/admin/ingestion", params={"q": "100%_"})).json()["total"] == 0
+
+    filtered = (await client.get("/api/v1/admin/ingestion", params={"status": "published"})).json()
+    assert filtered["total"] == 0 and filtered["status_counts"] == {"review_required": 7}
+    assert (await client.get("/api/v1/admin/ingestion", params={"page_size": 101})).status_code == 422
+    assert (await client.get("/api/v1/admin/ingestion", params={"status": "nope"})).status_code == 422
