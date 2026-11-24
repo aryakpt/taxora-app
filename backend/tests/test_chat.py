@@ -471,3 +471,60 @@ async def test_other_failures_are_retried_without_waiting(client, fake_ai, monke
 
     assert (await ask(client, "Berapa tarif pajak atas sewa?"))["answer_status"] == "failed"
     assert waits == []
+
+
+# --- follow-ups that answer Taxora's own clarification ---------------------------------------------------
+
+async def follow_up(client, question: str, conversation_id: str) -> dict:
+    return (await client.post("/api/v1/chat", json={"question": question, "conversation_id": conversation_id})).json()
+
+
+async def test_a_reply_to_a_clarification_is_answered_with_the_conversation_context(client, fake_ai):
+    """The screenshot case: Taxora asks for marital status; "belum kawin dan gaji bersifat tetap" has no tax
+    term and alone scores as small talk, but it continues the tax question."""
+    chunk_id = await seed_fixture_regulation()
+    llm = fake_ai.enable_llm(llm_answer(chunk_id, missing_information=["Status perkawinan dan jumlah tanggungan"]))
+    await sign_in(client)
+    first = await ask(client, "Berapa tarif pajak atas sewa?")
+    assert first["answer_status"] == "clarification_needed"
+
+    llm.response = llm_answer(chunk_id)
+    reply = await follow_up(client, "belum kawin dan gaji bersifat tetap", first["conversation_id"])
+
+    assert reply["answer_status"] == "answered"
+    prompt = llm.calls[-1][1]
+    assert "user: Berapa tarif pajak atas sewa?" in prompt
+    assert "assistant asked to clarify: Status perkawinan dan jumlah tanggungan" in prompt
+    assert (await stored_answer()).metadata_json["scope"]["reason"] == "follow_up"
+
+
+async def test_refused_small_talk_does_not_push_the_tax_question_out_of_the_history(client, fake_ai):
+    chunk_id = await seed_fixture_regulation()
+    llm = fake_ai.enable_llm(llm_answer(chunk_id))
+    await sign_in(client)
+    refused = await ask(client, "halo")
+    conversation = refused["conversation_id"]
+    await follow_up(client, "Berapa tarif pajak atas sewa?", conversation)
+    llm.response = llm_answer(chunk_id, in_scope=False, answer="-")
+    assert (await follow_up(client, "oiw", conversation))["answer_status"] == "out_of_scope"
+    assert (await follow_up(client, "hai lagi", conversation))["answer_status"] == "out_of_scope"
+
+    llm.response = llm_answer(chunk_id)
+    reply = await follow_up(client, "kalau tahun depan gimana?", conversation)
+
+    assert reply["answer_status"] == "answered"
+    prompt = llm.calls[-1][1]
+    assert "user: Berapa tarif pajak atas sewa?" in prompt
+    assert "oiw" not in prompt and "halo" not in prompt
+
+
+async def test_an_unrelated_question_in_a_tax_conversation_is_still_refused(client, fake_ai):
+    chunk_id = await seed_fixture_regulation()
+    llm = fake_ai.enable_llm(llm_answer(chunk_id))
+    await sign_in(client)
+    first = await ask(client, "Berapa tarif pajak atas sewa?")
+
+    llm.response = llm_answer(chunk_id, in_scope=False, answer="Here is a recipe instead")
+    reply = await follow_up(client, "Bagaimana resep rendang padang?", first["conversation_id"])
+
+    assert reply["answer_status"] == "out_of_scope" and "recipe" not in reply["answer"]

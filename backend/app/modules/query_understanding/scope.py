@@ -50,7 +50,7 @@ OTHER_ANCHORS = (
 @dataclass(frozen=True)
 class ScopeDecision:
     in_scope: bool
-    reason: str  # "tax_term" | "similarity" | "off_topic"
+    reason: str  # "tax_term" | "similarity" | "off_topic"; chat also records "follow_up" (see chat/service.py)
     similarity: float | None = None  # margin: closeness to tax anchors minus closeness to other anchors
 
 

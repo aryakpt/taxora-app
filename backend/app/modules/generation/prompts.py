@@ -4,7 +4,7 @@ answer so evaluation results can be compared across prompt versions (PRD §10.4)
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-PROMPT_VERSION = "chat-2026-11-24b"
+PROMPT_VERSION = "chat-2026-11-24c"  # history carries the clarifications asked
 HISTORY_ANSWER_CHARS = 1500
 
 
@@ -14,6 +14,8 @@ class Turn:
 
     question: str
     answer: str
+    # What the answer asked the user to clarify ("Status perkawinan…"); the next message often answers it.
+    missing: tuple[str, ...] = ()
 
 _LANGUAGE = {"id": "Bahasa Indonesia", "en": "English"}
 
@@ -86,7 +88,9 @@ def user_prompt(question: str, evidence: list[dict], history: Sequence[Turn] = (
         for item in evidence
     )
     turns = "\n".join(
-        f"<turn>\nuser: {_neutralize(turn.question)}\nassistant: {_neutralize(turn.answer[:HISTORY_ANSWER_CHARS])}\n</turn>"
+        f"<turn>\nuser: {_neutralize(turn.question)}\nassistant: {_neutralize(turn.answer[:HISTORY_ANSWER_CHARS])}"
+        + (f"\nassistant asked to clarify: {_neutralize('; '.join(turn.missing))}" if turn.missing else "")
+        + "\n</turn>"
         for turn in history
     )
     return (
