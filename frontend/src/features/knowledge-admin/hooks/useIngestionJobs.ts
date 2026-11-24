@@ -1,38 +1,55 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { IngestionJob } from '../../../shared/types/tax'
-import type { IngestionApi } from '../api/ingestionApi'
+import type { IngestionApi, JobPage, JobQuery } from '../api/ingestionApi'
 
 const POLL_INTERVAL_MS = 3_000
-const isActive = (job: IngestionJob) => job.status === 'queued' || job.status === 'processing'
+export const isActive = (job: IngestionJob) => job.status === 'queued' || job.status === 'processing'
 
-/** Job list that refreshes itself while any job is still being processed in the background. */
-export function useIngestionJobs(api: IngestionApi, onError: (message: string) => void) {
-  const [jobs, setJobs] = useState<IngestionJob[]>([])
+/** One page of the job table; refreshes itself while a job on the page is still being processed. */
+export function useJobPage(api: IngestionApi, query: JobQuery, onError: (message: string) => void) {
+  const [data, setData] = useState<JobPage | null>(null)
   const [loading, setLoading] = useState(true)
+  const { page, pageSize, status, search } = query
 
   const refresh = useCallback(async () => {
-    try { setJobs(await api.list()) }
+    try { setData(await api.list({ page, pageSize, status, search })) }
     catch (error) { onError((error as Error).message) }
     finally { setLoading(false) }
-  }, [api, onError])
+  }, [api, page, pageSize, status, search, onError])
 
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => { setLoading(true); void refresh() }, [refresh])
 
-  const processing = jobs.some(isActive)
+  const processing = data?.items.some(isActive) ?? false
   useEffect(() => {
     if (!processing) return
     const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS)
     return () => clearInterval(timer)
   }, [processing, refresh])
 
-  /** Replace one job with the server's answer after an action, without waiting for a full refresh. */
-  const replace = useCallback((job: IngestionJob) => {
-    setJobs(current => current.some(item => item.id === job.id)
-      ? current.map(item => item.id === job.id ? job : item)
-      : [job, ...current])
-  }, [])
+  return { data, loading, processing, refresh }
+}
 
-  const removeJob = useCallback((id: string) => setJobs(current => current.filter(item => item.id !== id)), [])
+/** One job for its detail page; refreshes itself while it is being processed. */
+export function useJob(api: IngestionApi, id: string, onError: (message: string) => void) {
+  const [job, setJob] = useState<IngestionJob | null>(null)
+  const [missing, setMissing] = useState(false)
 
-  return { jobs, loading, processing, refresh, replace, removeJob }
+  const refresh = useCallback(async () => {
+    try { setJob(await api.get(id)); setMissing(false) }
+    catch (error) {
+      if ([404, 422].includes((error as { status?: number }).status ?? 0)) setMissing(true)  // 422: not a job id
+      else onError((error as Error).message)
+    }
+  }, [api, id, onError])
+
+  useEffect(() => { setJob(null); void refresh() }, [refresh])
+
+  const processing = job ? isActive(job) : false
+  useEffect(() => {
+    if (!processing) return
+    const timer = setInterval(() => void refresh(), POLL_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [processing, refresh])
+
+  return { job, setJob, missing, refresh }
 }
