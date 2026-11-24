@@ -2,7 +2,7 @@
 
 .app-shell {
   min-height: 100vh;
-  background: tokens.$color-canvas;
+  background: var(--color-canvas);
 }
 
 .main-area {

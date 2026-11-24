@@ -13,7 +13,7 @@
   border-radius: 6px;
 
   .history-item { flex: 1; min-width: 0; padding-right: 30px; }
-  &:hover .history-item, &.selected .history-item, &.active .history-item { background: #eef0f1; }
+  &:hover .history-item, &.selected .history-item, &.active .history-item { background: var(--color-surface-muted); }
 }
 
 .history-more {
@@ -26,11 +26,11 @@
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: #87919a;
+  color: var(--text-secondary);
   opacity: 0;
   transition: opacity $motion-fast;
 
-  &:hover { background: #e2e6e8; color: $color-ink; }
+  &:hover { background: var(--color-surface-strong); color: var(--color-text); }
   &:focus-visible { opacity: 1; }
 }
 
@@ -39,17 +39,17 @@
 .history-entry.selected .history-more,
 .history-entry.active .history-more { opacity: 1; }
 
-@media (hover: none) { .history-more { opacity: 1; } }
+@include touch { .history-more { opacity: 1; } }
 
 .history-menu {
   position: fixed; // placed by ConversationItem against the viewport, see placeNear()
   z-index: 20;
   min-width: 150px;
   padding: 4px;
-  border: 1px solid $color-border;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: $color-surface;
-  box-shadow: 0 10px 30px #182b3a1f;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
 
   > button {
     width: 100%;
@@ -60,15 +60,15 @@
     border: 0;
     border-radius: 5px;
     background: transparent;
-    font-size: 12px;
-    color: $color-ink;
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
     text-align: left;
 
-    &:hover { background: #f4f5f6; }
+    &:hover { background: var(--color-surface-muted); }
   }
 
-  .danger { color: #9b514a; }
-  > .danger:hover { background: #fbefee; }
+  .danger { color: var(--color-danger-text); }
+  > .danger:hover { background: var(--color-danger-surface); }
 
 }
 
@@ -79,12 +79,12 @@
     min-width: 0;
     height: 24px;
     padding: 0 6px;
-    border: 1px solid $color-focus;
+    border: 1px solid var(--color-focus);
     border-radius: 4px;
-    background: $color-surface;
+    background: var(--color-surface);
     font: inherit;
-    font-size: 11px;
-    color: $color-ink;
+    font-size: var(--font-size-xs);
+    color: var(--color-text);
     outline: none;
   }
 }
@@ -93,12 +93,12 @@
 .history-heading-actions { display: flex; align-items: center; gap: 2px; }
 
 .history-group { border-radius: 7px; }
-.history-group.dropping, .history-ungrouped.dropping { background: $color-brand-green-soft; box-shadow: inset 0 0 0 1px #b4c9bb; }
+.history-group.dropping, .history-ungrouped.dropping { background: var(--color-surface-brand-strong); box-shadow: inset 0 0 0 1px var(--color-border-hover); }
 
 .history-group-header {
   width: 100%;
   font-weight: 600;
-  color: #4b5761;
+  color: var(--color-text-body);
 
   .history-group-chevron { margin-left: -2px; transition: transform $motion-fast; }
   .history-group-chevron.open { transform: rotate(90deg); }
@@ -107,9 +107,9 @@
 .history-group-count {
   flex-shrink: 0;
   margin-left: auto;
-  font-size: 10px;
+  font-size: var(--font-size-xs);
   font-weight: 500;
-  color: #9098a1;
+  color: var(--text-tertiary);
 }
 
 .history-group-entry:hover .history-group-count,
@@ -118,16 +118,16 @@
 .history-group-items {
   margin-left: 14px;
   padding-left: 6px;
-  border-left: 1px solid $color-border;
+  border-left: 1px solid var(--color-border);
   display: grid;
   gap: 2px;
 }
 
-.history-group-empty { margin: 4px 0 6px; padding: 0 8px; font-size: 10px; line-height: 1.5; color: #929aa2; }
+.history-group-empty { margin: 4px 0 6px; padding: 0 8px; font-size: var(--font-size-xs); line-height: 1.5; color: var(--text-tertiary); }
 
 .history-ungrouped { display: grid; gap: 2px; min-height: 24px; border-radius: 7px; }
 
-.history-subheading { padding: 10px 9px 4px; font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #9098a1; }
+.history-subheading { padding: 10px 9px 4px; font-size: var(--font-size-xs); font-weight: 700; letter-spacing: 1px; color: var(--text-tertiary); }
 
 .history-list { align-content: start; }
 
@@ -135,8 +135,21 @@
   max-height: min(420px, 70vh);
   overflow-y: auto;
 
-  .history-menu-label { padding: 8px 8px 4px; font-size: 9px; font-weight: 700; letter-spacing: 1px; color: #9098a1; }
+  .history-menu-label { padding: 8px 8px 4px; font-size: var(--font-size-xs); font-weight: 700; letter-spacing: 1px; color: var(--text-tertiary); }
   .history-menu-text { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  .history-menu-check { margin-left: auto; color: $color-brand-green; }
-  .history-menu-divider { height: 1px; margin: 4px; background: $color-border; }
+  .history-menu-check { margin-left: auto; color: var(--color-brand-green); }
+  .history-menu-divider { height: 1px; margin: 4px; background: var(--color-border); }
 }
+
+// Touch screens and narrow windows: sidebar targets near 44px (Apple HIG 44pt, Material 48dp).
+@mixin sidebar-touch-targets {
+  .nav-item { min-height: 44px; }
+  .history-item { min-height: 42px; }
+  .history-more { width: 36px; height: 36px; }
+  .history-entry .history-item { padding-right: 42px; } // room for the larger "more" button
+  .history-heading .icon-btn { width: 36px; height: 36px; }
+  .history-menu > button { min-height: 44px; }
+}
+
+@include drawer-layout { @include sidebar-touch-targets; }
+@include touch { @include sidebar-touch-targets; }

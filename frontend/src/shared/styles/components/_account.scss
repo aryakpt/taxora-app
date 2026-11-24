@@ -9,8 +9,8 @@
   border-radius: $radius-control;
   transition: background $motion-fast;
 
-  &:hover, &[aria-expanded='true'] { background: #eef0f1; }
-  > svg { flex-shrink: 0; color: #87919a; }
+  &:hover, &[aria-expanded='true'] { background: var(--color-surface-muted); }
+  > svg { flex-shrink: 0; color: var(--text-secondary); }
 }
 
 .profile-copy { min-width: 0; }
@@ -21,8 +21,8 @@
   display: grid;
   place-items: center;
   border-radius: 50%;
-  background: $color-brand-green-soft;
-  color: $color-brand-green;
+  background: var(--color-surface-brand-strong);
+  color: var(--color-brand-green);
   object-fit: cover;
 
   &.small { width: 30px; height: 30px; }
@@ -36,10 +36,10 @@
   right: 0;
   z-index: 6;
   padding: 6px;
-  border: 1px solid $color-border;
+  border: 1px solid var(--color-border);
   border-radius: $radius-card;
-  background: $color-surface;
-  box-shadow: 0 10px 30px #182b3a1f;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
 }
 
 .account-menu-header {
@@ -47,7 +47,7 @@
   gap: 10px;
   align-items: center;
   padding: 8px 8px 10px;
-  border-bottom: 1px solid #eef0f1;
+  border-bottom: 1px solid var(--color-border-subtle);
   margin-bottom: 4px;
 }
 
@@ -56,21 +56,21 @@
   display: grid;
   gap: 3px;
 
-  strong { font-size: 12px; color: $color-ink; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  > span:not(.role-badge) { font-size: 11px; color: $color-muted; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  strong { font-size: var(--font-size-xs); color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  > span:not(.role-badge) { font-size: var(--font-size-xs); color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 .role-badge {
   width: fit-content;
   padding: 2px 7px;
   border-radius: 20px;
-  background: #eef2f6;
-  color: #4f6275;
-  font-size: 10px;
+  background: var(--color-info-surface);
+  color: var(--color-info-text);
+  font-size: var(--font-size-xs);
   font-weight: 600;
 
-  &.admin { background: $color-brand-green-soft; color: $color-brand-green; }
-  &.reviewer { background: #fbf4e6; color: #8b6230; }
+  &.admin { background: var(--color-surface-brand-strong); color: var(--color-brand-green); }
+  &.reviewer { background: var(--color-warning-surface); color: var(--color-warning-text); }
 }
 
 .account-menu-item {
@@ -82,13 +82,13 @@
   border: 0;
   border-radius: $radius-control;
   background: transparent;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   text-align: left;
-  color: $color-ink;
+  color: var(--color-text);
 
-  &:hover { background: #f4f5f6; }
-  &.danger { color: #9b514a; }
-  &.danger:hover { background: #fbefee; }
+  &:hover { background: var(--color-surface-muted); }
+  &.danger { color: var(--color-danger-text); }
+  &.danger:hover { background: var(--color-danger-surface); }
 }
 
 .google-sign-in {
@@ -103,8 +103,8 @@
   align-items: center;
   gap: 10px;
   margin: 14px 0 4px;
-  color: $color-muted;
-  font-size: 11px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
 
-  &::before, &::after { content: ''; flex: 1; height: 1px; background: $color-border; }
+  &::before, &::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
 }

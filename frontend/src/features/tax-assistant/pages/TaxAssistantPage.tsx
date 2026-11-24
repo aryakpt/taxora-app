@@ -15,7 +15,10 @@ interface Props {
 }
 
 export function TaxAssistantPage({ messages, busy, error, feedback, onSend, onFeedback, onDismissError }: Props) {
+  const { t } = useTranslation()
   return <>
+    {/* The welcome screen has a visible h1; an open conversation keeps one for screen readers. */}
+    {messages.length > 0 && <h1 className="sr-only">{t('navigation.taxAssistant')}</h1>}
     <div className="chat-scroller">
       {messages.length ? <MessageList messages={messages} busy={busy} feedback={feedback} onFeedback={onFeedback} /> : <Welcome onSend={onSend} />}
     </div>
