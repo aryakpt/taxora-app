@@ -90,16 +90,6 @@ class SupabaseStorage:
         except httpx.HTTPError as exc:
             raise StorageError(f"Penyimpanan dokumen tidak dapat dihubungi ({type(exc).__name__}).") from exc
 
-    async def ensure_bucket(self) -> bool:
-        """Create the private bucket if it does not exist. Returns True when it was created."""
-        response = await self._send("GET", f"/bucket/{self.bucket}")
-        if response.status_code == 200:
-            return False
-        response = await self._send("POST", "/bucket", json={"id": self.bucket, "name": self.bucket, "public": False})
-        if response.status_code not in (200, 201):
-            raise StorageError(f"Bucket penyimpanan tidak dapat dibuat ({response.status_code}): {response.text[:200]}")
-        return True
-
     async def put(self, key: str, content: bytes) -> None:
         response = await self._send("POST", f"/object/{self.bucket}/{_object_name(key)}", content=content,
                                     headers={"Content-Type": "application/pdf", "x-upsert": "true"})

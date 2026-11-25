@@ -1,5 +1,4 @@
 # Never uploaded to Vercel: secrets, local data, and build/tool output.
-deploy/
 **/.env
 **/.env.*
 !**/.env.example
@@ -11,5 +10,4 @@ backend/tests/
 **/.ruff_cache/
 **/node_modules/
 frontend/dist/
-infra/
 .claude/

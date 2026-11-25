@@ -4,7 +4,7 @@ import type { ChatResponse, FeedbackRating } from '../../../shared/types/tax'
 export type ResponseLanguage = 'en' | 'id'
 
 // The backend tries up to LLM_ATTEMPTS models at up to LLM_TIMEOUT_SECONDS each, pausing after a busy (503)
-// reply; production allows 4 x 60 s (deploy/vercel.py), under the host's 300 s request limit. When Gemini is
+// reply; production allows 4 x 60 s (Vercel environment variables), under the host's 300 s request limit. When Gemini is
 // overloaded the one model still answering can take ~45 s. A shorter timeout would drop answers still coming.
 const CHAT_TIMEOUT_MS = 290_000
 
