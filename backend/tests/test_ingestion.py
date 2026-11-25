@@ -127,43 +127,102 @@ async def test_reviewer_corrects_dates_only_while_under_review(client, source):
     assert "ingestion.dates_updated" in actions
 
 
-CORRECTION = {"title": "[FIXTURE] Judul yang benar", "issuer": "Kementerian Keuangan", "topic": "PPh",
-              "issued_at": "2026-04-29", "effective_from": "2027-01-01", "effective_until": None,
-              "reason": "Tanggal berlaku keliru, lihat Pasal 2"}
+EDIT = {"regulation_type": "fixture", "regulation_number": "1 TAHUN 2026", "title": "[FIXTURE] Judul yang benar",
+        "issuer": "Kementerian Keuangan", "topic": "PPh", "issued_at": "2026-04-29", "effective_from": "2027-01-01",
+        "effective_until": None, "reason": "Tanggal berlaku keliru, lihat Pasal 2"}
 
 
-async def test_admin_corrects_metadata_of_a_published_document_with_a_reason(client, source):
+async def ask_rent(client) -> dict:
+    return (await client.post("/api/v1/chat", json={"question": "Berapa tarif pajak atas sewa?"})).json()
+
+
+async def test_editing_a_published_document_sends_it_back_to_review(client, source):
     await sign_in_as(client, "admin@example.com", UserRole.admin)
     job = await submit(client)
     base = f"/api/v1/admin/ingestion/{job['id']}"
-    assert (await client.put(f"{base}/metadata", json=CORRECTION)).status_code == 409  # still under review
     await client.post(f"{base}/approve")
     await client.post(f"{base}/publish")
-    asked = await client.post("/api/v1/chat", json={"question": "Berapa tarif pajak atas sewa?"})
-    assert "dikonfigurasi" in asked.json()["answer"]  # in force: evidence found (LLM not configured)
+    assert "dikonfigurasi" in (await ask_rent(client))["answer"]  # published: its evidence is found
 
-    corrected = await client.put(f"{base}/metadata", json=CORRECTION)
+    edited = await client.put(base, json={**EDIT, "effective_from": "2026-01-01"})
 
-    assert corrected.status_code == 200, corrected.text
-    body = corrected.json()
-    assert body["status"] == "published"  # stays published
-    assert body["regulation"]["title"] == "[FIXTURE] Judul yang benar"
-    assert body["version"]["effective_from"] == "2027-01-01" and body["version"]["issued_at"] == "2026-04-29"
+    assert edited.status_code == 200, edited.text
+    body = edited.json()
+    assert body["status"] == "review_required" and body["version"]["status"] == "review_required"
+    assert body["version"]["verified_at"] is None and body["regulation"]["title"] == "[FIXTURE] Judul yang benar"
     [entry] = body["corrections"]
     assert entry["reason"] == "Tanggal berlaku keliru, lihat Pasal 2" and entry["by"] == "admin@example.com"
-    assert entry["changes"]["effective_from"] == {"old": "2026-01-01", "new": "2027-01-01"}
-    assert "issuer" in entry["changes"] and "topic" not in entry["changes"]
-    # Retrieval follows the new dates at once: not in force yet, so no evidence.
-    asked = await client.post("/api/v1/chat", json={"question": "Berapa tarif pajak atas sewa?"})
-    assert asked.json()["answer_status"] == "insufficient_evidence" and "dikonfigurasi" not in asked.json()["answer"]
+    assert entry["back_to_review"] is True and entry["previous_status"] == "published"
+    assert set(entry["changes"]) == {"title", "issuer", "issued_at"}
+    # Out of the assistant until it is approved and published again.
+    assert "dikonfigurasi" not in (await ask_rent(client))["answer"]
+    assert (await client.post(f"{base}/approve")).status_code == 200
+    assert (await client.post(f"{base}/publish")).status_code == 200
+    assert "dikonfigurasi" in (await ask_rent(client))["answer"]
 
-    assert (await client.put(f"{base}/metadata", json=CORRECTION)).status_code == 409  # nothing changed
-    assert (await client.put(f"{base}/metadata", json={**CORRECTION, "reason": "x"})).status_code == 422
-    backwards = {**CORRECTION, "effective_until": "2026-01-01"}
-    assert (await client.put(f"{base}/metadata", json=backwards)).status_code == 422
+
+async def test_a_new_type_or_number_moves_the_document_to_that_regulation(client, source):
+    documents, _ = source
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    first = await submit(client)
+    other_url = "https://peraturan.bpk.go.id/Download/2/fixture.pdf"
+    documents[other_url] = make_pdf([*FIXTURE_LINES, "Dokumen lain"])
+    second = await submit(client, source_url=other_url, regulation_number="2 TAHUN 2026")
+
+    moved = await client.put(f"/api/v1/admin/ingestion/{first['id']}",
+                             json={**EDIT, "regulation_type": "pmk", "regulation_number": " 9  TAHUN 2026 "})
+
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["regulation"]["type"] == "PMK" and moved.json()["regulation"]["number"] == "9 TAHUN 2026"
+    async with SessionLocal() as session:  # the old regulation had only this document: removed
+        numbers = sorted((await session.scalars(select(Regulation.regulation_number))).all())
+    assert numbers == ["2 TAHUN 2026", "9 TAHUN 2026"]
+
+    # Onto a regulation that already has the same file: refused, nothing changes.
+    documents[URL] = PDF
+    same_file = await submit(client, source_url=URL, regulation_number="3 TAHUN 2026")
+    clash = await client.put(f"/api/v1/admin/ingestion/{same_file['id']}",
+                             json={**EDIT, "regulation_type": "PMK", "regulation_number": "9 TAHUN 2026"})
+    assert clash.status_code == 409 and "dokumen yang sama" in clash.json()["detail"]
+    assert (await client.get(f"/api/v1/admin/ingestion/{second['id']}")).json()["regulation"]["number"] == "2 TAHUN 2026"
+
+
+async def test_edit_rules(client, source):
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client)
+    base = f"/api/v1/admin/ingestion/{job['id']}"
+
+    under_review = await client.put(base, json=EDIT)  # still under review: stays there
+    assert under_review.status_code == 200 and under_review.json()["status"] == "review_required"
+    assert under_review.json()["corrections"][0]["back_to_review"] is False
+
+    assert (await client.put(base, json=EDIT)).status_code == 409  # nothing changed
+    assert (await client.put(base, json={**EDIT, "title": "Baru", "reason": "x"})).status_code == 422
+    assert (await client.put(base, json={**EDIT, "effective_until": "2026-01-01"})).status_code == 422
+    assert (await client.put(base, json={**EDIT, "regulation_number": " "})).status_code == 422
+    async with SessionLocal() as session, session.begin():
+        await session.execute(text("UPDATE ingestion_jobs SET status = 'processing'"))
+    assert (await client.put(base, json={**EDIT, "title": "Baru"})).status_code == 409
 
     await sign_in_as(client, "reviewer@example.com", UserRole.reviewer)
-    assert (await client.put(f"{base}/metadata", json={**CORRECTION, "title": "y"})).status_code == 403
+    assert (await client.put(base, json={**EDIT, "title": "y"})).status_code == 403
+
+
+async def test_a_failed_document_keeps_the_edited_dates_for_its_retry(client, source):
+    documents, _ = source
+    documents[URL] = sources.SourceRejected("Sumber tidak dapat dihubungi")
+    await sign_in_as(client, "admin@example.com", UserRole.admin)
+    job = await submit(client)
+    assert job["status"] == "failed"
+
+    edited = await client.put(f"/api/v1/admin/ingestion/{job['id']}", json=EDIT)
+    assert edited.status_code == 200 and edited.json()["status"] == "failed"
+
+    documents[URL] = PDF
+    await client.post(f"/api/v1/admin/ingestion/{job['id']}/retry")
+    retried = (await client.get(f"/api/v1/admin/ingestion/{job['id']}")).json()
+    assert retried["status"] == "review_required"
+    assert retried["version"]["effective_from"] == "2027-01-01" and retried["regulation"]["title"] == "[FIXTURE] Judul yang benar"
 
 
 async def test_reviewer_can_read_extracted_sections_and_the_original(client, source):

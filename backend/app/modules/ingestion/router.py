@@ -8,7 +8,7 @@ from app.core.database import SessionDep
 from app.modules.auth.dependencies import AdminUser, ReviewerUser
 from app.modules.ingestion import service, storage
 from app.modules.ingestion.models import IngestionJob, JobStatus
-from app.modules.ingestion.schemas import MetadataCorrection, Rejection, UploadForm, UrlSubmission, VersionDates
+from app.modules.ingestion.schemas import DocumentEdit, Rejection, UploadForm, UrlSubmission, VersionDates
 
 router = APIRouter(prefix="/api/v1/admin/ingestion", tags=["admin"])
 
@@ -139,10 +139,11 @@ async def update_dates(job_id: uuid.UUID, body: VersionDates, session: SessionDe
     return await _transition(lambda s, j, u: service.update_dates(s, j, u, body), session, job_id, user)
 
 
-@router.put("/{job_id}/metadata")
-async def correct_metadata(job_id: uuid.UUID, body: MetadataCorrection, session: SessionDep, user: AdminUser):
-    """Correct the metadata of an approved or published document (dates, title, issuer, topic), with a reason."""
-    return await _transition(lambda s, j, u: service.correct_metadata(s, j, u, body), session, job_id, user)
+@router.put("/{job_id}")
+async def edit_document(job_id: uuid.UUID, body: DocumentEdit, session: SessionDep, user: AdminUser):
+    """Edit a document's metadata (everything but the file and its link), with a reason. An approved,
+    published, or rejected document goes back to review; a published one leaves the assistant until then."""
+    return await _transition(lambda s, j, u: service.edit_document(s, j, u, body), session, job_id, user)
 
 
 @router.post("/{job_id}/reject")

@@ -1,9 +1,9 @@
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
 from fastapi import UploadFile
-from pydantic import BaseModel, Field, HttpUrl, field_validator, model_validator
+from pydantic import BaseModel, Field, HttpUrl, StringConstraints, field_validator, model_validator
 
 from app.modules.ingestion.sources import check_url
 
@@ -78,14 +78,19 @@ class VersionDates(BaseModel):
         return self
 
 
-class MetadataCorrection(VersionDates):
-    """An admin's correction of an approved or published document. The legal text cannot be changed this
-    way, and neither can the regulation's type and number (they identify it: re-submit instead)."""
+class DocumentEdit(VersionDates):
+    """An admin's edit of a document's metadata: everything except the file and its link, which identify the
+    reviewed content (re-submit to change those). An approved, published, or rejected document goes back to
+    review."""
 
-    title: str = Field(min_length=1, max_length=1000)
-    issuer: str = Field(min_length=1, max_length=200)
+    # Whitespace is trimmed before the length checks, so " " is rejected rather than stored empty.
+    regulation_type: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=30)]
+    regulation_number: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1000)]
+    issuer: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
     topic: Literal["PPh", "PPN", "other"]
-    reason: str = Field(min_length=5, max_length=500, description="Why the correction is needed; kept in the audit log.")
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=500)] = Field(
+        description="Why the edit is needed; kept in the audit log.")
 
 
 class UploadForm(RegulationMetadata):

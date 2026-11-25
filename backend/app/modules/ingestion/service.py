@@ -24,7 +24,7 @@ from app.modules.generation.embeddings import EmbeddingError
 from app.modules.ingestion import sources, storage
 from app.modules.ingestion.extraction import ExtractionError, chunks, extract_text, structural_sections
 from app.modules.ingestion.models import IngestionJob, JobStatus
-from app.modules.ingestion.schemas import MetadataCorrection, RegulationMetadata, Rejection, VersionDates
+from app.modules.ingestion.schemas import DocumentEdit, RegulationMetadata, Rejection, VersionDates
 from app.modules.regulations.models import DocumentChunk, LegalProvision, Regulation, RegulationVersion
 
 logger = logging.getLogger("taxora.ingestion")
@@ -374,38 +374,92 @@ async def update_dates(session: AsyncSession, job_id: uuid.UUID, user: User, dat
     return job
 
 
-CORRECTABLE = (JobStatus.approved.value, JobStatus.published.value)
+# Corrections made before edits existed (they did not send the document back to review); still shown.
 CORRECTION_ACTION = "ingestion.metadata_corrected"
+EDIT_ACTION = "ingestion.edited"
+REVIEW_AGAIN = (JobStatus.approved.value, JobStatus.published.value, JobStatus.rejected.value)
 
 
-async def correct_metadata(session: AsyncSession, job_id: uuid.UUID, user: User,
-                           correction: MetadataCorrection) -> IngestionJob:
-    """Fix wrong metadata of an approved or published document, with a reason. Old and new values are kept
-    in the audit log. A published document stays published: retrieval uses the new dates immediately."""
-    job, version = await _job_and_version(session, job_id)
-    if version is None or version.status not in CORRECTABLE:
-        raise InvalidTransition("Koreksi metadata hanya untuk dokumen yang sudah disetujui atau dipublikasikan. "
-                                "Selama ditinjau, ubah tanggal lewat formulir tinjauan.")
-    regulation = await session.get(Regulation, version.regulation_id)
+async def edit_document(session: AsyncSession, job_id: uuid.UUID, user: User, edit: DocumentEdit) -> IngestionJob:
+    """Change a document's metadata (not its file or link), with a reason; old and new values go to the audit
+    log. An approved, published, or rejected document goes back to review: a published one leaves the
+    assistant until it is approved and published again. Chunks hold only the legal text, so nothing is
+    re-embedded.
+
+    A new type or number moves the document to that regulation (found or created); the old regulation is
+    removed when nothing uses it any more."""
+    job = await session.get(IngestionJob, job_id, with_for_update=True)
+    if job is None:
+        raise JobNotFound
+    if job.status in (JobStatus.queued.value, JobStatus.processing.value):
+        raise InvalidTransition("Dokumen sedang diproses. Tunggu sampai selesai, lalu edit.")
+    version = await session.get(RegulationVersion, job.version_id) if job.version_id else None
+    current = await session.get(Regulation, job.regulation_id)
+    old_dates = {key: (getattr(version, key) if version else _date(job.metadata_json.get(key)))
+                 for key in ("issued_at", "effective_from", "effective_until")}
+
     wanted = {
-        "title": correction.title.strip(), "issuer": correction.issuer.strip(), "topic": correction.topic,
-        "issued_at": correction.issued_at, "effective_from": correction.effective_from,
-        "effective_until": correction.effective_until,
+        "regulation_type": edit.regulation_type.strip().upper(),
+        "regulation_number": " ".join(edit.regulation_number.split()),
+        "title": edit.title.strip(), "issuer": edit.issuer.strip(), "topic": edit.topic,
+        "issued_at": edit.issued_at, "effective_from": edit.effective_from, "effective_until": edit.effective_until,
     }
-    targets = {"title": regulation, "issuer": regulation, "topic": regulation,
-               "issued_at": version, "effective_from": version, "effective_until": version}
-    changes = {}
-    for field_name, new in wanted.items():
-        old = getattr(targets[field_name], field_name)
-        if old != new:
-            changes[field_name] = {"old": _plain(old), "new": _plain(new)}
-            setattr(targets[field_name], field_name, new)
+    old = {"regulation_type": current.regulation_type, "regulation_number": current.regulation_number,
+           "title": current.title, "issuer": current.issuer, "topic": current.topic, **old_dates}
+    changes = {key: {"old": _plain(old[key]), "new": _plain(value)} for key, value in wanted.items() if old[key] != value}
     if not changes:
-        raise InvalidTransition("Tidak ada perubahan metadata.")
-    session.add(AuditLog(actor_id=user.id, action=CORRECTION_ACTION, resource_id=str(job.id),
-                         details={"reason": correction.reason.strip(), "changes": changes}))
+        raise InvalidTransition("Tidak ada perubahan.")
+
+    regulation = current
+    if "regulation_type" in changes or "regulation_number" in changes:
+        regulation = await _move_to(session, job, version, current, wanted)
+    regulation.title, regulation.issuer, regulation.topic = wanted["title"], wanted["issuer"], wanted["topic"]
+    if version:
+        for key in old_dates:
+            setattr(version, key, wanted[key])
+    else:  # a failed job has no version yet: its retry reads the dates from the job
+        job.metadata_json = {**job.metadata_json, **{key: _plain(wanted[key]) for key in old_dates}}
+
+    previous_status = version.status if version else job.status
+    review_again = version is not None and version.status in REVIEW_AGAIN
+    if review_again:
+        version.status, version.verified_at = JobStatus.review_required.value, None
+        await session.execute(update(IngestionJob).where(IngestionJob.version_id == version.id)
+                              .values(status=JobStatus.review_required.value))
+    session.add(AuditLog(actor_id=user.id, action=EDIT_ACTION, resource_id=str(job.id), details={
+        "reason": edit.reason.strip(), "changes": changes, "previous_status": previous_status,
+        "back_to_review": review_again}))
     await session.flush()
+    await session.refresh(job)
     return job
+
+
+async def _move_to(session: AsyncSession, job: IngestionJob, version: RegulationVersion | None,
+                   current: Regulation, wanted: dict) -> Regulation:
+    target = await session.scalar(select(Regulation).where(
+        Regulation.regulation_type == wanted["regulation_type"],
+        Regulation.regulation_number == wanted["regulation_number"]))
+    if target is None:
+        target = Regulation(regulation_type=wanted["regulation_type"], regulation_number=wanted["regulation_number"],
+                            title=wanted["title"], issuer=wanted["issuer"], topic=wanted["topic"])
+        session.add(target)
+        await session.flush()
+    elif version and await session.scalar(select(func.count()).select_from(RegulationVersion).where(
+            RegulationVersion.regulation_id == target.id, RegulationVersion.document_hash == version.document_hash)):
+        raise InvalidTransition(f"{target.regulation_type} {target.regulation_number} sudah memiliki dokumen yang "
+                                "sama. Hapus salah satunya terlebih dahulu.")
+    moved = IngestionJob.id == job.id
+    if version:
+        version.regulation_id = target.id
+        moved = or_(moved, IngestionJob.version_id == version.id)
+    await session.execute(update(IngestionJob).where(moved).values(regulation_id=target.id))
+    await session.flush()
+    still_used = await session.scalar(select(func.count()).select_from(RegulationVersion)
+                                      .where(RegulationVersion.regulation_id == current.id)) or \
+        await session.scalar(select(func.count()).select_from(IngestionJob).where(IngestionJob.regulation_id == current.id))
+    if not still_used:
+        await session.delete(current)
+    return target
 
 
 def _plain(value):
@@ -424,7 +478,7 @@ async def rejection(session: AsyncSession, job_id: uuid.UUID) -> dict | None:
 async def corrections(session: AsyncSession, job_id: uuid.UUID) -> list[dict]:
     rows = (await session.execute(
         select(AuditLog, User.email).outerjoin(User, AuditLog.actor_id == User.id)
-        .where(AuditLog.resource_id == str(job_id), AuditLog.action == CORRECTION_ACTION)
+        .where(AuditLog.resource_id == str(job_id), AuditLog.action.in_((CORRECTION_ACTION, EDIT_ACTION)))
         .order_by(AuditLog.created_at.desc())
     )).all()
     return [{"at": log.created_at, "by": email, **(log.details or {})} for log, email in rows]
