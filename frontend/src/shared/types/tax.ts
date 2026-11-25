@@ -53,7 +53,8 @@ export interface IngestionJob {
   created_at: string
   updated_at: string
   storage_available: boolean
-  corrections: MetadataCorrectionEntry[]
+  /** Metadata changes, newest first (edits, and corrections made before edits existed). */
+  corrections: DocumentChange[]
   rejection: { at: string; by: string | null; reason: string } | null
   regulation: { id: string; type: string; number: string; title: string; issuer: string; topic: string } | null
   version: {
@@ -67,11 +68,14 @@ export interface IngestionJob {
   } | null
 }
 
-export interface MetadataCorrectionEntry {
+export interface DocumentChange {
   at: string
   by: string | null
   reason: string
   changes: Record<string, { old: string | null; new: string | null }>
+  /** Edits only: the status before, and whether the edit sent the document back to review. */
+  previous_status?: JobStatus
+  back_to_review?: boolean
 }
 
 export interface ExtractedSection {

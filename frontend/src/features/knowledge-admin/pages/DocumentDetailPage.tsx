@@ -46,7 +46,7 @@ export function DocumentDetailPage({ request }: Props) {
     {missing
       ? <div className="empty-panel compact"><p>{t('admin.detail.notFound')}</p><Link className="text-button" to={backTo}>{t('admin.detail.back')}</Link></div>
       : job
-        ? <JobReviewPanel key={job.id} job={job} api={api} isAdmin={isAdmin} onChanged={changed} onDeleted={deleted} onError={showError} />
+        ? <JobReviewPanel key={job.id} job={job} api={api} isAdmin={isAdmin} onChanged={changed} onDeleted={deleted} onError={showError} backTo={backTo} />
         : <div className="empty-panel compact"><p>{t('common.loading')}</p></div>}
   </section>
 }

@@ -23,7 +23,10 @@ export interface VersionDates {
   effective_until: string | null
 }
 
-export interface MetadataCorrection extends VersionDates {
+/** Everything an admin can edit: the metadata without the file and its link, plus why. */
+export interface DocumentEdit extends VersionDates {
+  regulation_type: string
+  regulation_number: string
   title: string
   issuer: string
   topic: RegulationMetadata['topic']
@@ -65,8 +68,7 @@ export function createIngestionApi(request: ApiRequest) {
     },
     provisions: (id: string) => request<ExtractedSection[]>(`${BASE}/${id}/provisions`),
     updateDates: (id: string, dates: VersionDates) => request<IngestionJob>(`${BASE}/${id}/dates`, { method: 'PUT', data: dates }),
-    correctMetadata: (id: string, correction: MetadataCorrection) =>
-      request<IngestionJob>(`${BASE}/${id}/metadata`, { method: 'PUT', data: correction }),
+    edit: (id: string, changes: DocumentEdit) => request<IngestionJob>(`${BASE}/${id}`, { method: 'PUT', data: changes }),
     approve: (id: string) => action(id, 'approve'),
     publish: (id: string) => action(id, 'publish'),
     retry: (id: string) => action(id, 'retry'),

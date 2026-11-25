@@ -2,8 +2,9 @@ import { useRef, useState, type FormEvent } from 'react'
 import { ArrowUpRight, FileUp, Link2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { RegulationMetadata } from '../api/ingestionApi'
-import { REGULATION_TYPES, regulationType } from '../regulationTypes'
+import { regulationType } from '../regulationTypes'
 import { FieldLabel } from './FieldLabel'
+import { MetadataFields } from './MetadataFields'
 
 type Mode = 'url' | 'upload'
 
@@ -19,17 +20,11 @@ export function IngestionForm({ onSubmit }: Props) {
   const { t } = useTranslation()
   const [mode, setMode] = useState<Mode>('url')
   const [form, setForm] = useState<RegulationMetadata>(EMPTY)
-  // The issuer follows the regulation type until the admin edits it (e.g. a joint regulation).
-  const [issuerEdited, setIssuerEdited] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const fileInput = useRef<HTMLInputElement>(null)
 
   const set = <K extends keyof RegulationMetadata>(key: K, value: RegulationMetadata[K]) => setForm(current => ({ ...current, [key]: value }))
-  const setDate = (key: 'issued_at' | 'effective_from' | 'effective_until', value: string) => set(key, value || null)
-  const setType = (code: string) => setForm(current => ({
-    ...current, regulation_type: code, issuer: issuerEdited ? current.issuer : regulationType(code)?.issuer ?? current.issuer,
-  }))
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -37,7 +32,6 @@ export function IngestionForm({ onSubmit }: Props) {
     try {
       if (await onSubmit(form, mode === 'upload' ? file : null)) {
         setForm(EMPTY)
-        setIssuerEdited(false)
         setFile(null)
         if (fileInput.current) fileInput.current.value = ''
       }
@@ -65,42 +59,7 @@ export function IngestionForm({ onSubmit }: Props) {
       </label>
     </fieldset>
 
-    <fieldset className="form-section">
-      <div className="form-grid">
-        <label><FieldLabel text={t('admin.regulationType')} help="regulationType" />
-          <select value={form.regulation_type} onChange={event => setType(event.target.value)}>
-            {REGULATION_TYPES.map(type => <option key={type.code} value={type.code}>{t('admin.typeOption', { code: type.code, name: type.name })}</option>)}
-          </select>
-        </label>
-        <label><FieldLabel text={t('admin.regulationNumber')} help="regulationNumber" />
-          <input required value={form.regulation_number} onChange={event => set('regulation_number', event.target.value)} placeholder={t('admin.regulationNumberPlaceholder')} />
-        </label>
-      </div>
-
-      <label><FieldLabel text={t('admin.titleField')} help="title" />
-        <textarea required rows={2} maxLength={1000} value={form.title} onChange={event => set('title', event.target.value)} placeholder={t('admin.titlePlaceholder')} />
-      </label>
-
-      <div className="form-grid">
-        <label><FieldLabel text={t('admin.issuer')} help="issuer" />
-          <input required maxLength={200} value={form.issuer} onChange={event => { setIssuerEdited(true); set('issuer', event.target.value) }} />
-        </label>
-        <label><FieldLabel text={t('admin.topic')} help="topic" />
-          <select value={form.topic} onChange={event => set('topic', event.target.value as RegulationMetadata['topic'])}>
-            {(['PPh', 'PPN', 'other'] as const).map(topic => <option key={topic} value={topic}>{t(`admin.topics.${topic}`)}</option>)}
-          </select>
-        </label>
-      </div>
-    </fieldset>
-
-    <fieldset className="form-section">
-      <div className="form-grid three">
-        <label><FieldLabel text={t('admin.issuedAt')} help="issuedAt" /><input type="date" value={form.issued_at ?? ''} onChange={event => setDate('issued_at', event.target.value)} /></label>
-        <label><FieldLabel text={t('admin.effectiveFrom')} help="effectiveFrom" /><input type="date" value={form.effective_from ?? ''} onChange={event => setDate('effective_from', event.target.value)} /></label>
-        <label><FieldLabel text={t('admin.effectiveUntil')} help="effectiveUntil" /><input type="date" value={form.effective_until ?? ''} onChange={event => setDate('effective_until', event.target.value)} /></label>
-      </div>
-      <small className="form-note">{t('admin.datesHint')}</small>
-    </fieldset>
+    <MetadataFields value={form} onChange={metadata => setForm(current => ({ ...current, ...metadata }))} />
 
     <button className="primary-button" type="submit" disabled={busy}>{busy ? t('admin.submitting') : t('admin.submit')} <ArrowUpRight size={15} /></button>
   </form>
