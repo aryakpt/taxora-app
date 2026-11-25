@@ -6,6 +6,7 @@ import { TaxAssistantPage } from '../features/tax-assistant/pages/TaxAssistantPa
 import { KnowledgeAdminPage } from '../features/knowledge-admin/pages/KnowledgeAdminPage'
 import { NewDocumentPage } from '../features/knowledge-admin/pages/NewDocumentPage'
 import { DocumentDetailPage } from '../features/knowledge-admin/pages/DocumentDetailPage'
+import { EditDocumentPage } from '../features/knowledge-admin/pages/EditDocumentPage'
 import { RegulationLibraryPage } from '../features/regulation-library/pages/RegulationLibraryPage'
 
 interface Props {
@@ -28,7 +29,10 @@ export function AppRouter({ request, messages, busy, error, feedback, setError, 
       <Route path="/admin" element={<KnowledgeAdminPage request={request} />} />
       <Route path="/admin/documents/:jobId" element={<DocumentDetailPage request={request} />} />
     </>}
-    {user?.role === 'admin' && <Route path="/admin/documents/new" element={<NewDocumentPage request={request} />} />}
+    {user?.role === 'admin' && <>
+      <Route path="/admin/documents/new" element={<NewDocumentPage request={request} />} />
+      <Route path="/admin/documents/:jobId/edit" element={<EditDocumentPage request={request} />} />
+    </>}
     <Route path="*" element={<Navigate to="/" replace />} />
   </Routes>
 }

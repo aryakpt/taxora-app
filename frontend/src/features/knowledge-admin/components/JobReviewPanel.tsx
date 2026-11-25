@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, Ban, CheckCircle2, Download, ExternalLink, RotateCcw, Send, Trash2 } from 'lucide-react'
+import { AlertTriangle, Ban, CheckCircle2, Download, ExternalLink, PencilLine, RotateCcw, Send, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { ExtractedSection, IngestionJob } from '../../../shared/types/tax'
-import type { IngestionApi, MetadataCorrection, VersionDates } from '../api/ingestionApi'
+import type { IngestionApi, VersionDates } from '../api/ingestionApi'
 import { ConfirmDialog } from '../../../shared/components/ConfirmDialog'
 import { regulationTypeName } from '../regulationTypes'
 import { FieldLabel } from './FieldLabel'
 import { jobLabel } from './IngestionJobTable'
-import { MetadataCorrectionForm } from './MetadataCorrectionForm'
+import { ChangeHistory } from './ChangeHistory'
 
 interface Props {
   job: IngestionJob
@@ -16,6 +17,8 @@ interface Props {
   onChanged: (job: IngestionJob, notice: string) => void
   onDeleted: (jobId: string, notice: string) => void
   onError: (message: string) => void
+  /** The table address this page returns to; passed through the edit page so its way back keeps it. */
+  backTo: string
 }
 
 const datesOf = (job: IngestionJob): VersionDates => ({
@@ -24,7 +27,7 @@ const datesOf = (job: IngestionJob): VersionDates => ({
   effective_until: job.version?.effective_until ?? null,
 })
 
-export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onError }: Props) {
+export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onError, backTo }: Props) {
   const { t, i18n } = useTranslation()
   const [sections, setSections] = useState<ExtractedSection[] | null>(null)
   const [dates, setDates] = useState<VersionDates>(() => datesOf(job))
@@ -54,16 +57,6 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onErro
     finally { setBusy(false) }
   }
 
-  async function correct(correction: MetadataCorrection) {
-    try {
-      onChanged(await api.correctMetadata(job.id, correction), t('admin.correction.saved'))
-      return true
-    } catch (error) {
-      onError((error as Error).message)
-      return false
-    }
-  }
-
   async function reject() {
     setBusy(true)
     try {
@@ -86,7 +79,6 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onErro
   }
 
   const processing = job.status === 'queued' || job.status === 'processing'
-  const correctable = isAdmin && !!job.version && (job.status === 'approved' || job.status === 'published')
   const sectionLabel = (section: ExtractedSection) => {
     if (section.kind === 'article') return t('admin.review.article', { number: section.number })
     if (section.kind === 'elucidation' && section.number) return t('admin.review.elucidationOf', { number: section.number })
@@ -103,6 +95,9 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onErro
         {job.regulation && <p className="review-type">{regulationTypeName(job.regulation.type)}</p>}
         {job.regulation && <p className="review-title">{job.regulation.title}</p>}
       </div>
+      {isAdmin && !processing && <Link className="secondary-button" to={`/admin/documents/${job.id}/edit`} state={{ backTo }}>
+        <PencilLine size={14} />{t('admin.edit.action')}
+      </Link>}
     </header>
 
     <dl className="review-facts">
@@ -133,10 +128,10 @@ export function JobReviewPanel({ job, api, isAdmin, onChanged, onDeleted, onErro
       </div>
       {underReview
         ? <button className="secondary-button" disabled={!datesChanged} onClick={() => void run(() => api.updateDates(job.id, dates), t('admin.review.datesSaved'))}>{t('admin.review.saveDates')}</button>
-        : job.status !== 'rejected' && <small>{t('admin.review.datesFrozen')}</small>}
+        : job.status !== 'rejected' && <small>{t(isAdmin ? 'admin.review.datesFrozenAdmin' : 'admin.review.datesFrozen')}</small>}
     </fieldset>}
 
-    {correctable && <MetadataCorrectionForm key={job.updated_at} job={job} onSubmit={correct} />}
+    <ChangeHistory changes={job.corrections} />
 
     {job.version && <div className="review-sections">
       <h3>{t('admin.review.sections')}{sections && <span> · {t('admin.review.sectionCount', { count: sections.length })}</span>}</h3>
