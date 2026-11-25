@@ -2,7 +2,7 @@ BACKEND := backend
 PY := $(BACKEND)/.venv/bin/python
 
 .PHONY: help db-up db-down db-reset install migrate api web test lint check set-role seed ask-raw eval eval-draft reprocess reindex \
-	prod prod-migrate deploy-env deploy deploy-logs
+	migration-sql
 
 help:  ## List available commands
 	@grep -E '^[a-z-]+:.*##' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -65,21 +65,7 @@ check:  ## Everything CI runs: lint, all tests (database required), frontend bui
 	cd $(BACKEND) && REQUIRE_TEST_DATABASE=1 .venv/bin/pytest -q
 	cd frontend && npm run build
 
-# --- Production: settings from deploy/.env.production (README "Deployment") ------------------------------
+# --- Production: nothing here connects to it (README "Deployment") ---------------------------------------
 
-PROD := cd $(BACKEND) && .venv/bin/python ../deploy/prodenv.py
-
-prod:  ## Run an app.cli command against production, e.g. make prod CMD="set-role you@x.com admin"
-	$(PROD) .venv/bin/python -m app.cli $(CMD)
-
-prod-migrate:  ## Apply database migrations to production
-	$(PROD) .venv/bin/alembic upgrade head
-
-deploy-env:  ## Set Vercel's production variables (secrets included) from deploy/.env.production
-	cd deploy && ../$(PY) vercel.py env
-
-deploy:  ## Build and deploy the frontend and the API to Vercel production
-	cd deploy && ../$(PY) vercel.py deploy
-
-deploy-logs:  ## Recent runtime logs of the production deployment
-	cd deploy && ../$(PY) vercel.py logs
+migration-sql:  ## Print the SQL of migrations after FROM (offline, no connection), e.g. make migration-sql FROM=0009_conversation_groups
+	cd $(BACKEND) && .venv/bin/alembic upgrade $(if $(FROM),$(FROM):)head --sql

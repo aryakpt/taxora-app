@@ -6,10 +6,8 @@
     .venv/bin/python -m app.cli reindex
     .venv/bin/python -m app.cli ask-raw "<question>"
     .venv/bin/python -m app.cli eval-retrieval [--include-unreviewed]
-    .venv/bin/python -m app.cli prepare-storage
-    .venv/bin/python -m app.cli copy-knowledge [--source-database-url URL] [--source-documents DIR]
 
-Against production, run them through `make prod CMD="..."` (reads deploy/.env.production).
+They use backend/.env. Production is changed only through the Vercel and Supabase dashboards.
 """
 
 import argparse
@@ -40,38 +38,6 @@ DEV_SEED_USERS = (
 
 class CommandError(Exception):
     pass
-
-
-LOCAL_DATABASE_URL = "postgresql+asyncpg://taxora:taxora@localhost:5432/taxora"
-
-
-async def prepare_storage() -> str:
-    """Create the private Supabase Storage bucket for original PDFs (no-op when it exists)."""
-    from app.modules.ingestion import storage
-
-    backend = storage.configured()
-    if not isinstance(backend, storage.SupabaseStorage):
-        return "local disk storage: nothing to prepare"
-    try:
-        created = await backend.ensure_bucket()
-    except storage.StorageError as exc:
-        raise CommandError(str(exc)) from exc
-    return f"bucket {backend.bucket!r} {'created' if created else 'already exists'}"
-
-
-async def copy_knowledge(source_database_url: str, source_documents: str) -> dict:
-    from pathlib import Path
-
-    from app.modules.ingestion import storage
-    from app.modules.regulations import transfer
-
-    if source_database_url == settings.database_url:
-        raise CommandError("Source and target are the same database. Run this with the target's settings, "
-                           "e.g. make prod CMD=copy-knowledge.")
-    try:
-        return await transfer.copy_published(source_database_url, engine, Path(source_documents))
-    except (ValueError, storage.StorageError, FileNotFoundError) as exc:
-        raise CommandError(str(exc)) from exc
 
 
 async def set_role(email: str, role: UserRole) -> str:
@@ -208,11 +174,6 @@ def main(argv: list[str] | None = None) -> int:
     eval_parser = commands.add_parser("eval-retrieval", help="score the scope guard and retrieval on the dataset")
     eval_parser.add_argument("--include-unreviewed", action="store_true",
                              help="also search documents not yet published (evaluation only)")
-    commands.add_parser("prepare-storage", help="create the Supabase Storage bucket for original PDFs")
-    copy_parser = commands.add_parser(
-        "copy-knowledge", help="copy published regulations (with embeddings and PDFs) from another database")
-    copy_parser.add_argument("--source-database-url", default=LOCAL_DATABASE_URL)
-    copy_parser.add_argument("--source-documents", default=str(settings.document_storage_dir))
     args = parser.parse_args(argv)
 
     async def run():
@@ -227,10 +188,6 @@ def main(argv: list[str] | None = None) -> int:
                 return await ask_raw(args.question)
             if args.command == "eval-retrieval":
                 return await eval_retrieval(args.include_unreviewed)
-            if args.command == "prepare-storage":
-                return await prepare_storage()
-            if args.command == "copy-knowledge":
-                return await copy_knowledge(args.source_database_url, args.source_documents)
             return await seed_dev_users()
         finally:
             await engine.dispose()
@@ -253,10 +210,6 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "ask-raw":
         model, answer = result
         print(f"[{model}] — no sources, no checks\n\n{answer}")
-    elif args.command == "prepare-storage":
-        print(result)
-    elif args.command == "copy-knowledge":
-        print("copied:", result)
     elif args.command == "eval-retrieval":
         for summary in result:
             print_evaluation(summary)

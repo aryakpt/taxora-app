@@ -80,22 +80,6 @@ async def test_storage_failures_become_storage_errors():
         await backend.get(KEY)
 
 
-async def test_the_bucket_is_created_once_and_private():
-    created = []
-
-    def handler(request: httpx.Request):
-        if request.method == "GET":
-            return httpx.Response(200 if created else 404, json={})
-        created.append(json.loads(request.content))
-        return httpx.Response(200, json={"name": "documents"})
-
-    backend, _ = supabase(handler)
-
-    assert await backend.ensure_bucket() is True
-    assert await backend.ensure_bucket() is False
-    assert created == [{"id": "documents", "name": "documents", "public": False}]
-
-
 def request_from(peer: str, forwarded: str | None) -> Request:
     headers = [(b"x-forwarded-for", forwarded.encode())] if forwarded else []
     return Request({"type": "http", "headers": headers, "client": (peer, 1234)})

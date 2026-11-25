@@ -47,7 +47,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt -r requirements-dev.txt
       - name: Create the test database (same script as the local Docker volume)
-        run: psql -h localhost -U taxora -d taxora -v ON_ERROR_STOP=1 -f ../infra/postgres/init/01-databases.sql
+        run: psql -h localhost -U taxora -d taxora -v ON_ERROR_STOP=1 -f tests/init-db.sql
       - name: Lint
         run: ruff check .
       - name: Test
