@@ -1,3 +1,4 @@
+import time
 import uuid
 
 import jwt
@@ -24,15 +25,24 @@ def test_password_hash_verifies_without_storing_plaintext():
     assert not verify_password("not-the-password", encoded)
 
 
-def test_session_token_round_trips_user_id():
+def test_session_token_round_trips_user_id_and_session_version():
     user_id = uuid.uuid4()
 
-    assert decode_access_token(create_access_token(user_id)) == user_id
+    assert decode_access_token(create_access_token(user_id, 3)) == (user_id, 3)
+
+
+def test_a_token_without_a_session_version_is_rejected():
+    now = int(time.time())
+    old_token = jwt.encode({"sub": str(uuid.uuid4()), "iat": now, "exp": now + 60, "type": "access"},
+                           settings.auth_secret_key, algorithm="HS256")
+
+    with pytest.raises(InvalidSessionToken):
+        decode_access_token(old_token)
 
 
 def test_expired_session_token_is_rejected():
     expired_token = jwt.encode(
-        {"sub": str(uuid.uuid4()), "iat": 1, "exp": 2, "type": "access"},
+        {"sub": str(uuid.uuid4()), "iat": 1, "exp": 2, "type": "access", "ver": 0},
         settings.auth_secret_key,
         algorithm="HS256",
     )

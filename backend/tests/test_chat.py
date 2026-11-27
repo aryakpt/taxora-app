@@ -304,6 +304,24 @@ async def test_the_answer_id_is_returned_for_feedback(client, fake_ai):
             ).status_code in (200, 201)
 
 
+@pytest.mark.parametrize("payload", [
+    {"message_id": None, "rating": "positive"},
+    {"message_id": "not-a-uuid", "rating": "positive"},
+    {"rating": "great"},
+    {"rating": "negative", "reason": "x" * 101},
+    {"rating": "negative", "reason": ["not", "text"]},
+])
+async def test_invalid_feedback_is_a_validation_error_not_a_server_error(client, fake_ai, payload):
+    chunk_id = await seed_fixture_regulation()
+    fake_ai.enable_llm(llm_answer(chunk_id))
+    await sign_in(client)
+    body = await ask(client, "Berapa tarif pajak atas sewa?")
+
+    response = await client.post("/api/v1/feedback", json={"message_id": body["message_id"], **payload})
+
+    assert response.status_code == 422
+
+
 async def test_a_year_in_the_question_selects_the_rules_of_that_year(client, fake_ai):
     chunk_id = await seed_fixture_regulation()
     async with SessionLocal() as session, session.begin():

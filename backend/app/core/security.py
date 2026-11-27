@@ -23,27 +23,30 @@ def verify_password(password: str, password_hash: str) -> bool:
     return password_hasher.verify(password, password_hash)
 
 
-def create_access_token(user_id: uuid.UUID) -> str:
+def create_access_token(user_id: uuid.UUID, session_version: int) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         "sub": str(user_id),
         "iat": now,
         "exp": now + timedelta(minutes=settings.auth_session_minutes),
         "type": "access",
+        "ver": session_version,  # must equal users.session_version: raising it ends every session
     }
     return jwt.encode(payload, settings.auth_secret_key, algorithm="HS256")
 
 
-def decode_access_token(token: str) -> uuid.UUID:
+def decode_access_token(token: str) -> tuple[uuid.UUID, int]:
     try:
         payload: dict[str, Any] = jwt.decode(
             token,
             settings.auth_secret_key,
             algorithms=["HS256"],
-            options={"require": ["exp", "iat", "sub", "type"]},
+            options={"require": ["exp", "iat", "sub", "type", "ver"]},
         )
         if payload["type"] != "access":
             raise InvalidTokenError("Invalid token type")
-        return uuid.UUID(payload["sub"])
+        if not isinstance(payload["ver"], int):
+            raise InvalidTokenError("Invalid session version")
+        return uuid.UUID(payload["sub"]), payload["ver"]
     except (InvalidTokenError, KeyError, ValueError, TypeError) as exc:
         raise InvalidSessionToken("Invalid or expired session") from exc

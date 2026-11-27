@@ -64,19 +64,32 @@ async def test_first_google_sign_in_creates_an_account_and_a_session(client):
     assert actions == ["auth.google.created"] and user.password_hash is None
 
 
-async def test_an_existing_password_account_with_the_same_email_is_linked(client):
+async def test_linking_google_removes_a_password_set_by_someone_who_may_not_own_the_email(client):
+    # Registration does not verify email: someone else may have registered the owner's address first.
     registered = await client.post("/api/v1/auth/register", json={
         "email": "pengguna@gmail.com", "full_name": "Nama Sendiri", "password": "a-long-test-password-123"})
+    earlier_session = dict(client.cookies)
     client.cookies.clear()
 
     linked = await sign_in(client, credential())
 
     assert linked.json()["id"] == registered.json()["id"]
     assert linked.json()["full_name"] == "Nama Sendiri"  # the user's own name is kept
+    assert (await client.get("/api/v1/auth/me")).status_code == 200  # the Google session works
+    owner_session = dict(client.cookies)
     client.cookies.clear()
-    password_still_works = await client.post("/api/v1/auth/login", json={
+    password_login = await client.post("/api/v1/auth/login", json={
         "email": "pengguna@gmail.com", "password": "a-long-test-password-123"})
-    assert password_still_works.status_code == 200
+    assert password_login.status_code == 401
+    client.cookies.clear()
+    client.cookies.update(earlier_session)
+    assert (await client.get("/api/v1/auth/me")).status_code == 401  # the session made with the password ended
+    client.cookies.clear()
+    client.cookies.update(owner_session)
+    assert (await client.get("/api/v1/auth/me")).status_code == 200
+    async with SessionLocal() as session:
+        details = await session.scalar(select(AuditLog.details).where(AuditLog.action == "auth.google.linked"))
+    assert details == {"password_removed": True}
 
 
 async def test_an_email_linked_to_another_google_account_is_refused(client):

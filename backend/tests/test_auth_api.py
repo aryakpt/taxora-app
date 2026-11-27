@@ -32,6 +32,22 @@ async def test_duplicate_email_is_rejected_case_insensitively(client):
     assert duplicate.status_code == 409
 
 
+async def test_logout_ends_the_session_on_the_server(client):
+    await client.post("/api/v1/auth/register", json=ACCOUNT)
+    copied = dict(client.cookies)  # e.g. a cookie taken from the browser before logging out
+
+    assert (await client.post("/api/v1/auth/logout")).status_code == 204
+    client.cookies.update(copied)
+
+    assert (await client.get("/api/v1/auth/me")).status_code == 401
+
+
+async def test_logout_without_a_valid_session_only_clears_the_cookie(client):
+    client.cookies.set("taxora_session", "not-a-token")
+
+    assert (await client.post("/api/v1/auth/logout")).status_code == 204
+
+
 async def test_login_logout_cycle(client):
     await client.post("/api/v1/auth/register", json=ACCOUNT)
     await client.post("/api/v1/auth/logout")

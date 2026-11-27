@@ -71,15 +71,15 @@ async def test_bearer_session_token_works_for_api_clients(client):
     async with SessionLocal() as session:
         user = await session.scalar(select(User).where(User.email == "api@example.com"))
 
-    response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {create_access_token(user.id)}"})
+    response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {create_access_token(user.id, user.session_version)}"})
 
     assert response.status_code == 200
 
 
 async def test_token_for_deleted_account_is_rejected(client):
     response = await client.get(
-        "/api/v1/auth/me", headers={"Authorization": f"Bearer {create_access_token(uuid.uuid4())}"}
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {create_access_token(uuid.uuid4(), 0)}"}
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Account no longer exists"
+    assert response.json()["detail"] == "Invalid or expired session"

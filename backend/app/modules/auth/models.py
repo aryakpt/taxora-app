@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import CheckConstraint, DateTime, String, Text, func
+from sqlalchemy import CheckConstraint, DateTime, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -32,4 +32,6 @@ class User(Base):
     google_sub: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)  # Google account id
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     role: Mapped[str] = mapped_column(String(20), default=UserRole.user.value)
+    # Every session token carries this number; raising it (logout, linking Google) ends all existing sessions.
+    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
