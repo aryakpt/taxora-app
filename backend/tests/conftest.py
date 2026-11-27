@@ -20,7 +20,6 @@ from sqlalchemy import text  # noqa: E402
 
 from app.core.config import settings  # noqa: E402
 from app.core.database import engine  # noqa: E402
-from app.core.rate_limit import limiter  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Base  # noqa: E402
 from app.modules.generation import providers  # noqa: E402
@@ -64,11 +63,6 @@ async def clean_database(migrated_database):
     tables = ", ".join(table.name for table in Base.metadata.sorted_tables)
     async with engine.begin() as connection:
         await connection.execute(text(f"TRUNCATE {tables} CASCADE"))
-
-
-@pytest.fixture(autouse=True)
-def reset_rate_limits():
-    limiter.reset()
 
 
 @pytest.fixture(autouse=True)

@@ -1,20 +1,31 @@
+import asyncio
+
 import pytest
+from sqlalchemy import text
 
+from app.core import rate_limit
 from app.core.config import settings
-from app.core.rate_limit import SlidingWindowLimiter
+from app.core.database import engine
 
 
-def test_sliding_window_blocks_after_limit_and_recovers():
-    now = [0.0]
-    limiter = SlidingWindowLimiter(clock=lambda: now[0])
+@pytest.mark.db
+async def test_the_sliding_window_is_shared_through_the_database_and_recovers():
+    assert await rate_limit.hit("k", limit=2, window_seconds=60) is None
+    assert await rate_limit.hit("k", limit=2, window_seconds=60) is None
+    assert 58 < await rate_limit.hit("k", limit=2, window_seconds=60) <= 60
+    assert await rate_limit.hit("other", limit=2, window_seconds=60) is None
 
-    assert limiter.hit("k", limit=2, window_seconds=60) is None
-    assert limiter.hit("k", limit=2, window_seconds=60) is None
-    assert limiter.hit("k", limit=2, window_seconds=60) == 60
-    assert limiter.hit("other", limit=2, window_seconds=60) is None
+    # Another instance sees the same counts (they live in the database); once the hits age out, it allows again.
+    async with engine.begin() as connection:
+        await connection.execute(text("UPDATE rate_limit_hits SET at = at - interval '61 seconds'"))
+    assert await rate_limit.hit("k", limit=2, window_seconds=60) is None
 
-    now[0] = 60.0
-    assert limiter.hit("k", limit=2, window_seconds=60) is None
+
+@pytest.mark.db
+async def test_concurrent_requests_cannot_exceed_the_limit():
+    results = await asyncio.gather(*(rate_limit.hit("burst", limit=3, window_seconds=60) for _ in range(8)))
+
+    assert sum(result is None for result in results) == 3
 
 
 @pytest.mark.db

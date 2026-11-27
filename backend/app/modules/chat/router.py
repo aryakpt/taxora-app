@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 @router.post("", response_model=ChatResponse)
 async def chat(body: ChatRequest, session: SessionDep, user: CurrentUser):
     # Per account, so one user cannot exhaust the shared LLM quota.
-    enforce(f"chat:{user.id}", settings.chat_requests_per_hour, window_seconds=3600)
+    await enforce(f"chat:{user.id}", settings.chat_requests_per_hour, window_seconds=3600)
     try:
         return await answer_question(body, session, user)
     except ConversationNotFound as exc:

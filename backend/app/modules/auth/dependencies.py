@@ -8,24 +8,37 @@ from app.core.security import InvalidSessionToken, decode_access_token
 from app.modules.auth.models import User, UserRole
 
 
+def session_token(authorization: str | None, session_cookie: str | None) -> str | None:
+    """The Bearer token (API clients) or else the session cookie (browser)."""
+    token = authorization.removeprefix("Bearer ") if authorization and authorization.startswith("Bearer ") else None
+    return token or session_cookie
+
+
+async def session_user(session, token: str | None) -> User | None:
+    """The account of a valid, current session token, else None. A token is current only while its version
+    equals the account's session_version: logging out or linking Google raises it and ends older sessions."""
+    if not token:
+        return None
+    try:
+        user_id, version = decode_access_token(token)
+    except InvalidSessionToken:
+        return None
+    user = await session.get(User, user_id)
+    return user if user is not None and user.session_version == version else None
+
+
 async def current_user(
     session: SessionDep,
     authorization: Annotated[str | None, Header()] = None,
     session_cookie: Annotated[str | None, Cookie(alias=settings.auth_cookie_name)] = None,
 ) -> User:
     """Authenticate with the session cookie (browser) or a Bearer session token (API clients)."""
-    token = authorization.removeprefix("Bearer ") if authorization and authorization.startswith("Bearer ") else None
-    token = token or session_cookie
+    token = session_token(authorization, session_cookie)
     if not token:
         raise HTTPException(status_code=401, detail="Authentication required")
-
-    try:
-        user_id = decode_access_token(token)
-    except InvalidSessionToken as exc:
-        raise HTTPException(status_code=401, detail=str(exc)) from exc
-    user = await session.get(User, user_id)
+    user = await session_user(session, token)
     if user is None:
-        raise HTTPException(status_code=401, detail="Account no longer exists")
+        raise HTTPException(status_code=401, detail="Invalid or expired session")
     return user
 
 

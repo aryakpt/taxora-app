@@ -1,6 +1,7 @@
 """Import every module's models so Base.metadata is complete (Alembic, tests)."""
 
 from app.core.database import Base
+from app.core.rate_limit import RateLimitHit
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import User
 from app.modules.conversations.models import Conversation, Message
@@ -19,6 +20,7 @@ __all__ = [
     "IngestionJob",
     "LegalProvision",
     "Message",
+    "RateLimitHit",
     "Regulation",
     "RegulationVersion",
     "User",
